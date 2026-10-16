@@ -1,0 +1,1082 @@
+/*
+ * Scratch card pages (claim, another card, track).
+ * Holy Gift palette: black #111111, white, background #F7F8FA, gold accent #D4AF37, border #E5E7EB.
+ */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f8fa;
+}
+
+.main {
+  --sc-black: #111111;
+  --sc-black-hover: #2b2b2b;
+  --sc-gold: #d4af37;
+  --sc-border: #e5e7eb;
+  --sc-muted: #6b7280;
+  --sc-text: #1f2937;
+  --sc-danger: #dc2626;
+  --sc-gold-soft: #f6efd9;
+  --sc-gold-deep: #8a6d12;
+  --sc-warm-border: #ece4cf;
+
+  flex: 1;
+  padding: 32px 0 40px;
+  /* Colourful mesh taken from the campaign banner: pink, violet, orange and green glows on a light base. */
+  --sc-violet: #7c3aed;
+  --sc-pink: #db2777;
+  --sc-orange: #f97316;
+  --sc-brand-gradient: linear-gradient(90deg, #7c3aed 0%, #db2777 50%, #f97316 100%);
+  background:
+    radial-gradient(ellipse 55% 45% at 0% 0%, rgba(219, 39, 119, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 100% 5%, rgba(124, 58, 237, 0.16), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 5% 100%, rgba(249, 115, 22, 0.13), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 100% 100%, rgba(34, 197, 94, 0.12), transparent 70%),
+    #fbf7ff;
+  color: var(--sc-text);
+  font-family: var(--font-sc-inter), var(--font-sc-hind), "Hind Siliguri", system-ui, sans-serif;
+}
+
+.container {
+  width: 90%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ── Banner ── */
+.bannerWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.banner {
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sc-border);
+}
+
+/* Natural aspect ratio: never cropped or stretched, whatever size is uploaded. */
+.bannerImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* When a separate mobile banner exists, swap it in on small screens. */
+.bannerMobile {
+  display: none;
+}
+
+/* ── Page heading ── */
+.pageHead {
+  margin-bottom: 28px;
+}
+
+.badge {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--sc-border);
+  color: var(--sc-black);
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  /* Gradient text; solid colour first as a fallback. */
+  color: var(--sc-violet);
+  background: var(--sc-brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  max-width: 640px;
+  color: var(--sc-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* ── Two-column layout (40 / 60) ── */
+/* Instructions take the remaining space; the claim form caps at about 780px,
+   wide enough to keep the phone label on one line. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 780px);
+  gap: 48px;
+  align-items: start;
+}
+
+/* After a successful submit only the confirmation card is shown, centred. */
+.layoutSuccess {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ── Left: how to claim ── */
+.guide {
+  position: sticky;
+  top: 24px;
+}
+
+.guideTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.guideTitle::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sc-brand-gradient);
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step {
+  --step-gradient: linear-gradient(135deg, #db2777, #f97316);
+  --step-tint: rgba(219, 39, 119, 0.08);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 20px rgba(76, 29, 149, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.step:nth-child(2) {
+  --step-gradient: linear-gradient(135deg, #7c3aed, #2563eb);
+  --step-tint: rgba(124, 58, 237, 0.08);
+}
+
+.step:nth-child(3) {
+  --step-gradient: linear-gradient(135deg, #16a34a, #0d9488);
+  --step-tint: rgba(22, 163, 74, 0.08);
+}
+
+.step:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(76, 29, 149, 0.1);
+}
+
+.stepIcon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--step-gradient);
+  color: #fff;
+  box-shadow: 0 6px 14px var(--step-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stepNum {
+  align-self: flex-start;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--sc-violet);
+  background: var(--step-tint);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.stepTitle {
+  margin-top: 1px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.stepText {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.guideLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sc-black);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.guideLink:hover {
+  border-bottom-color: var(--sc-black);
+}
+
+/* Same link, placed centred under the submit button. */
+.formTrackLink {
+  align-self: center;
+  margin-top: -4px;
+}
+
+/* ── Right: claim form card ── */
+.card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(76, 29, 149, 0.05), 0 20px 48px rgba(76, 29, 149, 0.1);
+  overflow: hidden;
+}
+
+/* Brand gradient strip along the top of every card. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--sc-brand-gradient);
+}
+
+.cardHead {
+  padding: 26px 28px 20px;
+  border-bottom: 1px solid #f1ecfb;
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.05), transparent);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.cardHint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--sc-danger);
+}
+
+.form {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+}
+
+/* Label, input and error share rows across the pair, so a label that wraps
+   to two lines does not push its input below the neighbouring one. */
+.row > .field {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  align-content: start;
+}
+
+.row > .field > .label {
+  align-self: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--sc-text);
+  padding: 0;
+}
+
+.required {
+  color: var(--sc-danger);
+}
+
+.input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 16px;
+  color: var(--sc-black);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input::placeholder {
+  color: #9ca3af;
+}
+
+.input:hover {
+  border-color: #9ca3af;
+}
+
+.input:focus {
+  border-color: var(--sc-violet);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.14);
+}
+
+.inputLatin {
+  letter-spacing: 0.02em;
+}
+
+.inputInvalid,
+.inputInvalid:hover {
+  border-color: var(--sc-danger);
+}
+
+.inputInvalid:focus {
+  border-color: var(--sc-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.textarea {
+  height: auto;
+  min-height: 104px;
+  padding: 14px 16px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.help {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--sc-muted);
+}
+
+.fieldError {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sc-danger);
+}
+
+.fieldError::before {
+  content: "!";
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--sc-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* Image upload */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1.5px dashed #c4b5fd;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.05), rgba(219, 39, 119, 0.05));
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dropzone:hover,
+.fileInput:focus-visible + .dropzone {
+  border-color: var(--sc-violet);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.09), rgba(219, 39, 119, 0.09));
+}
+
+.dropzoneInvalid {
+  border-color: var(--sc-danger);
+}
+
+.dropIcon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--sc-brand-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(219, 39, 119, 0.25);
+}
+
+.dropText {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--sc-muted);
+  line-height: 1.5;
+}
+
+.dropText strong {
+  display: block;
+  color: var(--sc-black);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--sc-border);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.previewImg {
+  width: 76px;
+  height: 76px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.previewInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.previewName {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sc-black);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewSize {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--sc-muted);
+}
+
+.previewAction,
+.previewRemove {
+  flex-shrink: 0;
+  border: 1px solid var(--sc-border);
+  background: #fff;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.previewAction {
+  color: var(--sc-black);
+}
+
+.previewRemove {
+  color: var(--sc-danger);
+}
+
+.previewAction:hover,
+.previewRemove:hover {
+  background: #f9fafb;
+}
+
+.formFields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.formFields:disabled {
+  opacity: 0.7;
+}
+
+/* Messages and buttons */
+.error {
+  margin: 0;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--sc-danger);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.submit {
+  width: 100%;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--sc-black, #111111);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.submit:hover {
+  background: var(--sc-black-hover, #2b2b2b);
+}
+
+.submit:disabled {
+  cursor: not-allowed;
+  background: #4b4b4b;
+}
+
+/* Green claim button on the form; other .submit buttons stay black. */
+.submitGreen {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+
+.submitGreen:hover {
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(22, 163, 74, 0.35);
+}
+
+.submitGreen:disabled {
+  background: #4ade80;
+}
+
+.secondaryBtn {
+  width: 100%;
+  height: 50px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #111111;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.secondaryBtn:hover {
+  background: #f9fafb;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sc-spin 0.7s linear infinite;
+}
+
+@keyframes sc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Success state ── */
+.success {
+  padding: 40px 28px;
+  text-align: center;
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.3);
+}
+
+.successTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.successText {
+  margin: 8px auto 24px;
+  max-width: 440px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--sc-muted);
+}
+
+.successBtn {
+  width: auto;
+  padding: 0 24px;
+}
+
+.successMeta {
+  margin: 0 auto 24px;
+  max-width: 440px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  text-align: left;
+}
+
+.successMeta > div {
+  border: 1px solid var(--sc-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.successMeta dt {
+  font-size: 12px;
+  color: var(--sc-muted);
+}
+
+.successMeta dd {
+  margin: 4px 0 0;
+}
+
+.reference {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--sc-black);
+  letter-spacing: 0.04em;
+}
+
+.statusPill {
+  display: inline-block;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: rgba(212, 175, 55, 0.1);
+  color: #8a6d12;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nextSteps {
+  margin: 0 auto 28px;
+  max-width: 440px;
+  text-align: left;
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.nextStepsTitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.nextSteps ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.successActions {
+  margin: 0 auto;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Already-claimed popup (rendered outside .main) ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(17, 17, 17, 0.55);
+}
+
+.modal {
+  width: min(100%, 420px);
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  text-align: center;
+  font-family: var(--font-sc-inter), var(--font-sc-hind), "Hind Siliguri", system-ui, sans-serif;
+  box-shadow: 0 24px 60px rgba(17, 17, 17, 0.25);
+}
+
+.modalIcon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.12);
+  color: #8a6d12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111111;
+  line-height: 1.4;
+}
+
+.modalText {
+  margin: 10px 0 22px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #4b5563;
+}
+
+.modalText strong {
+  color: #111111;
+  white-space: nowrap;
+}
+
+.modalActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Track page ── */
+.trackWrap {
+  width: min(100%, 680px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.trackHead {
+  text-align: center;
+}
+
+.trackHead .subtitle {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.trackForm {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trackRow {
+  display: flex;
+  gap: 10px;
+}
+
+.trackBtn {
+  width: auto;
+  height: 48px;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
+.trackEmpty {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.trackLinkBtn {
+  text-decoration: none;
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trackCount {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sc-muted);
+}
+
+.trackItem {
+  padding: 18px 20px;
+}
+
+.trackItemHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trackPrize {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--sc-black);
+}
+
+.trackMeta {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--sc-muted);
+}
+
+.trackStatus {
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trackNote {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #f0f1f3;
+  font-size: 13.5px;
+  color: #4b5563;
+}
+
+/* ── Small desktop: keep two columns but tighten the gap ── */
+@media (max-width: 1200px) {
+  .layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 32px;
+  }
+}
+
+/* ── Tablet ── */
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .guide {
+    position: static;
+  }
+
+  /* Steps sit three across on tablets, each with its short description. */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .step {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .stepText {
+    font-size: 13px;
+  }
+
+}
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .main {
+    padding: 16px 0 48px;
+  }
+
+  .container {
+    width: calc(100% - 24px);
+  }
+
+  .bannerWrap {
+    margin-bottom: 20px;
+  }
+
+  .banner {
+    border-radius: 10px;
+  }
+
+  .hasMobileBanner .bannerDesktop {
+    display: none;
+  }
+
+  .hasMobileBanner .bannerMobile {
+    display: block;
+  }
+
+  .pageHead {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .subtitle {
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 14px;
+  }
+
+  .title {
+    font-size: 23px;
+  }
+
+  .guideTitle {
+    font-size: 15px;
+    text-align: center;
+  }
+
+  /* Phones: back to one step per row (icon left, text right) so the description has room. */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .step {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .stepIcon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stepText {
+    font-size: 13px;
+  }
+
+  .stepTitle {
+    font-size: 13.5px;
+  }
+
+  .stepNum {
+    font-size: 11px;
+  }
+
+  .cardHead {
+    padding: 20px 18px 16px;
+  }
+
+  .form {
+    padding: 20px 18px;
+    gap: 20px;
+  }
+
+  .row {
+    grid-template-columns: 1fr;
+    row-gap: 20px;
+  }
+
+  .row > .field {
+    display: flex;
+    grid-row: auto;
+  }
+
+  .row > .field > .label {
+    align-self: auto;
+  }
+
+  .success {
+    padding: 32px 18px;
+  }
+
+  .trackRow {
+    flex-direction: column;
+  }
+
+  .trackBtn {
+    width: 100%;
+  }
+
+  .trackForm {
+    padding: 18px;
+  }
+}

@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -51,6 +52,73 @@ type Field = "fullName" | "phone" | "address" | "image" | "prize";
 type FieldErrors = Partial<Record<Field, string>>;
 
 const TICKET_ICON = STEPS[0].icon;
+
+// `value` is what is stored on the claim; the track page maps it back to Bangla.
+// `tone` is the card's accent gradient [from, to].
+const PRIZES: {
+  value: string;
+  label: string;
+  tone: [string, string];
+  icon: ReactNode;
+}[] = [
+  {
+    value: "TV",
+    label: "টিভি",
+    tone: ["#2563eb", "#7c3aed"],
+    icon: (
+      <>
+        <rect x="3" y="5" width="18" height="12" rx="2" />
+        <path d="M8 21h8M12 17v4" />
+      </>
+    ),
+  },
+  {
+    value: "Fridge",
+    label: "ফ্রিজ",
+    tone: ["#0891b2", "#2563eb"],
+    icon: (
+      <>
+        <rect x="6" y="2.5" width="12" height="19" rx="2" />
+        <path d="M6 10h12M9 6v2M9 13v3" />
+      </>
+    ),
+  },
+  {
+    value: "Rice Cooker",
+    label: "রাইস কুকার",
+    tone: ["#16a34a", "#0d9488"],
+    icon: (
+      <>
+        <path d="M4 11h16v5a4 4 0 01-4 4H8a4 4 0 01-4-4v-5z" />
+        <path d="M6 11a6 6 0 0112 0M10 5h4" />
+      </>
+    ),
+  },
+  {
+    value: "Induction Chula",
+    label: "ইন্ডাকশন চুলা",
+    tone: ["#f97316", "#db2777"],
+    icon: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="12" cy="11.5" r="3" />
+        <path d="M8 16.5h8" />
+      </>
+    ),
+  },
+  {
+    value: "Luxury Wall Watch",
+    label: "লাক্সারি দেয়াল ঘড়ি",
+    tone: ["#b8860b", "#e6c35c"],
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="6.5" />
+        <path d="M12 3v1.5M21 12h-1.5M12 21v-1.5M3 12h1.5M12 8.5V12l2.5 1.5" />
+      </>
+    ),
+  },
+];
 
 // Thrown for an HTTP error response, so the catch below can tell it apart from
 // a request that never reached the server.
@@ -191,7 +259,7 @@ export default function ScratchCardClient({
       next.phone = "সঠিক ১১ ডিজিটের ফোন নম্বর দিন (01XXXXXXXXX)";
     if (!address.trim()) next.address = "ডেলিভারি ঠিকানা লিখুন";
     if (!image) next.image = "স্ক্র্যাচ কার্ডের ছবি আপলোড করুন";
-    if (!prize.trim()) next.prize = "আপনার পাওয়া পুরস্কারটির নাম লিখুন";
+    if (!prize.trim()) next.prize = "আপনার প্রাপ্ত পুরস্কারটি নির্বাচন করুন";
     return next;
   };
 
@@ -603,29 +671,64 @@ export default function ScratchCardClient({
                         />
                       </div>
 
-                      <div className={styles.field}>
-                        <label htmlFor="sc-prize" className={styles.label}>
-                          আপনার প্রাপ্ত পুরস্কারটির নাম লিখুন{" "}
+                      <div
+                        className={styles.field}
+                        role="radiogroup"
+                        aria-labelledby="sc-prize-label"
+                        aria-invalid={Boolean(errors.prize)}
+                        aria-describedby={
+                          errors.prize ? "sc-prize-error" : undefined
+                        }
+                      >
+                        <span id="sc-prize-label" className={styles.label}>
+                          আপনার প্রাপ্ত পুরস্কারটি নির্বাচন করুন{" "}
                           <span className={styles.required} aria-hidden="true">
                             *
                           </span>
-                        </label>
-                        <input
-                          id="sc-prize"
-                          type="text"
-                          maxLength={64}
-                          value={prize}
-                          onChange={(e) => {
-                            setPrize(e.target.value);
-                            clearError("prize");
-                          }}
-                          placeholder="যেমন: ফ্রিজ"
-                          className={inputClass("prize")}
-                          aria-invalid={Boolean(errors.prize)}
-                          aria-describedby={
-                            errors.prize ? "sc-prize-error" : undefined
-                          }
-                        />
+                        </span>
+                        <div className={styles.prizeGrid}>
+                          {PRIZES.map((p, i) => (
+                            <label
+                              key={p.value}
+                              style={
+                                {
+                                  "--prize-from": p.tone[0],
+                                  "--prize-to": p.tone[1],
+                                } as CSSProperties
+                              }
+                              className={`${styles.prizeOption} ${
+                                prize === p.value ? styles.prizeOptionActive : ""
+                              } ${errors.prize ? styles.prizeOptionInvalid : ""}`}
+                            >
+                              <input
+                                id={i === 0 ? "sc-prize" : undefined}
+                                type="radio"
+                                name="prize"
+                                value={p.value}
+                                checked={prize === p.value}
+                                onChange={() => {
+                                  setPrize(p.value);
+                                  clearError("prize");
+                                }}
+                                className={styles.prizeRadio}
+                              />
+                              <span className={styles.prizeIcon}>
+                                <Icon size={22}>{p.icon}</Icon>
+                              </span>
+                              <span className={styles.prizeText}>
+                                <strong>{p.label}</strong>
+                                {p.value}
+                              </span>
+                              {prize === p.value && (
+                                <span className={styles.prizeCheck} aria-hidden="true">
+                                  <Icon size={14}>
+                                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                                  </Icon>
+                                </span>
+                              )}
+                            </label>
+                          ))}
+                        </div>
                         <FieldError
                           id="sc-prize-error"
                           message={errors.prize}

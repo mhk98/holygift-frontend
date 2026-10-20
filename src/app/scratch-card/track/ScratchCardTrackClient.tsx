@@ -21,10 +21,12 @@ interface TrackedClaim {
 
 const PRIZE_LABELS: Record<string, string> = {
   TV: "টিভি",
+  Fridge: "ফ্রিজ",
   Freeze: "ফ্রিজ",
   "Rice Cooker": "রাইস কুকার",
   "Induction Chula": "ইন্ডাকশন চুলা",
-  "Big Size Wall Watch": "বড় সাইজের দেয়াল ঘড়ি",
+  "Big Size Wall Watch": "লাক্সারি দেয়াল ঘড়ি",
+  "Luxury Wall Watch": "লাক্সারি দেয়াল ঘড়ি",
 };
 
 const STATUS_META: Record<string, { label: string; text: string; tone: string }> = {

@@ -47,6 +47,8 @@ const STEPS = [
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PHONE_PATTERN = /^01\d{9}$/;
+// Pathao rejects shorter delivery addresses.
+const MIN_ADDRESS_LENGTH = 10;
 
 type Field = "fullName" | "phone" | "address" | "image" | "prize";
 type FieldErrors = Partial<Record<Field, string>>;
@@ -258,6 +260,8 @@ export default function ScratchCardClient({
     else if (!PHONE_PATTERN.test(phone.trim()))
       next.phone = "সঠিক ১১ ডিজিটের ফোন নম্বর দিন (01XXXXXXXXX)";
     if (!address.trim()) next.address = "ডেলিভারি ঠিকানা লিখুন";
+    else if (address.trim().length < MIN_ADDRESS_LENGTH)
+      next.address = "পুরো ঠিকানা লিখুন (গ্রাম/এলাকা, থানা, জেলা) — কমপক্ষে ১০ অক্ষর";
     if (!image) next.image = "স্ক্র্যাচ কার্ডের ছবি আপলোড করুন";
     if (!prize.trim()) next.prize = "আপনার প্রাপ্ত পুরস্কারটি নির্বাচন করুন";
     return next;
@@ -596,7 +600,7 @@ export default function ScratchCardClient({
                           />
                         ) : (
                           <p id="sc-address-help" className={styles.help}>
-                            যে ঠিকানায় আপনার অর্ডার ডেলিভারি হয়েছিল
+                            যে ঠিকানায় আপনার অর্ডার ডেলিভারি হয়েছিল (গ্রাম/এলাকা, থানা, জেলা)
                           </p>
                         )}
                       </div>

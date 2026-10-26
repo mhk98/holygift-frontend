@@ -11,10 +11,12 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Select, { type StylesConfig } from "react-select";
 import MarqueeBanner from "@/components/MarqueeBanner";
 import { BASE } from "@/lib/api";
 import { scratchCardFontClass } from "./fonts";
 import styles from "./ScratchCard.module.css";
+import type { ScratchCardPrize } from "@/services/scratchCardPrizeService";
 
 const STEPS = [
   {
@@ -55,14 +57,19 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 const TICKET_ICON = STEPS[0].icon;
 
-// `value` is what is stored on the claim; the track page maps it back to Bangla.
+// Prizes are managed in the admin (Scratch Card > Prizes). These are the
+// built-in looks for the original prizes, and the list the form falls back to
+// if the admin list cannot be loaded. `value` is what is stored on the claim.
 // `tone` is the card's accent gradient [from, to].
-const PRIZES: {
+interface PrizeOption {
   value: string;
   label: string;
   tone: [string, string];
   icon: ReactNode;
-}[] = [
+  image?: string | null;
+}
+
+const BUILT_IN_PRIZES: PrizeOption[] = [
   {
     value: "TV",
     label: "টিভি",
@@ -120,7 +127,137 @@ const PRIZES: {
       </>
     ),
   },
+  {
+    value: "Watch",
+    label: "ঘড়ি",
+    tone: ["#334155", "#64748b"],
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="5.5" />
+        <path d="M9 7l.7-4h4.6l.7 4M9 17l.7 4h4.6l.7-4M12 10v2l1.5 1" />
+      </>
+    ),
+  },
+  {
+    value: "Vacuum Flask Set",
+    label: "ভ্যাকুয়াম ফ্লাস্ক সেট",
+    tone: ["#0284c7", "#4f46e5"],
+    icon: (
+      <>
+        <path d="M8 3h5v2H8zM7.5 5h6v2.5l.5 1V20a1 1 0 01-1 1H8a1 1 0 01-1-1V8.5l.5-1z" />
+        <path d="M17 11h3v8a1 1 0 01-1 1h-1a1 1 0 01-1-1v-8zM7 12h7" />
+      </>
+    ),
+  },
 ];
+
+const GIFT_ICON = (
+  <>
+    <rect x="3" y="8" width="18" height="13" rx="2" />
+    <path d="M3 12h18M12 8v13M12 8S10.5 3.5 8 3.5a2.25 2.25 0 000 4.5h4zM12 8s1.5-4.5 4-4.5a2.25 2.25 0 010 4.5h-4z" />
+  </>
+);
+
+const EXTRA_TONES: [string, string][] = [
+  ["#7c3aed", "#db2777"],
+  ["#0d9488", "#2563eb"],
+  ["#ea580c", "#ca8a04"],
+  ["#4f46e5", "#0891b2"],
+  ["#be123c", "#9333ea"],
+];
+
+function toPrizeOptions(prizes: ScratchCardPrize[] | null | undefined): PrizeOption[] {
+  if (!prizes) return BUILT_IN_PRIZES;
+  let extra = 0;
+  return prizes.map((p) => {
+    const builtIn = BUILT_IN_PRIZES.find((b) => b.value === p.name);
+    return {
+      value: p.name,
+      label: p.nameBn || builtIn?.label || p.name,
+      tone: builtIn?.tone || EXTRA_TONES[extra++ % EXTRA_TONES.length],
+      icon: builtIn?.icon || GIFT_ICON,
+      image: p.image,
+    };
+  });
+}
+
+// One prize in the dropdown and its selected value: icon, Bangla name, English name.
+function PrizeLabel({ prize }: { prize: PrizeOption }) {
+  return (
+    <span
+      className={styles.prizeLabel}
+      style={
+        {
+          "--prize-from": prize.tone[0],
+          "--prize-to": prize.tone[1],
+        } as CSSProperties
+      }
+    >
+      <span className={styles.prizeIcon}>
+        {prize.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={prize.image} alt="" className={styles.prizeImage} />
+        ) : (
+          <Icon size={18}>{prize.icon}</Icon>
+        )}
+      </span>
+      <span className={styles.prizeText}>
+        <strong>{prize.label}</strong>
+        {prize.value}
+      </span>
+    </span>
+  );
+}
+
+// react-select styled like the form's other inputs (.input in the CSS module).
+function prizeSelectStyles(invalid: boolean): StylesConfig<PrizeOption, false> {
+  return {
+    control: (base, state) => ({
+      ...base,
+      minHeight: 56,
+      borderRadius: 12,
+      borderColor: invalid
+        ? "var(--sc-danger)"
+        : state.isFocused
+          ? "var(--sc-violet)"
+          : "#d1d5db",
+      boxShadow: state.isFocused
+        ? invalid
+          ? "0 0 0 3px rgba(220, 38, 38, 0.12)"
+          : "0 0 0 4px rgba(124, 58, 237, 0.14)"
+        : "none",
+      "&:hover": {
+        borderColor: invalid
+          ? "var(--sc-danger)"
+          : state.isFocused
+            ? "var(--sc-violet)"
+            : "#9ca3af",
+      },
+      cursor: "pointer",
+    }),
+    valueContainer: (base) => ({ ...base, padding: "4px 12px" }),
+    placeholder: (base) => ({ ...base, color: "#9ca3af", fontSize: 15 }),
+    input: (base) => ({ ...base, fontSize: 15 }),
+    menuPortal: (base) => ({ ...base, zIndex: 40 }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: 12,
+      overflow: "hidden",
+      boxShadow: "0 12px 32px -12px rgba(15, 23, 42, 0.25)",
+    }),
+    option: (base, state) => ({
+      ...base,
+      padding: "8px 12px",
+      cursor: "pointer",
+      backgroundColor: state.isSelected
+        ? "rgba(124, 58, 237, 0.12)"
+        : state.isFocused
+          ? "#f5f3ff"
+          : "#fff",
+      color: "inherit",
+    }),
+  };
+}
 
 // Thrown for an HTTP error response, so the catch below can tell it apart from
 // a request that never reached the server.
@@ -184,6 +321,8 @@ interface ScratchCardClientProps extends Pick<SiteChromeSlots, "header"> {
   initialPhone?: string;
   /** Admin-managed banner rendered above the page content. */
   banner?: ReactNode;
+  /** Active prizes from the admin; null/undefined falls back to the built-in list. */
+  prizes?: ScratchCardPrize[] | null;
 }
 
 export default function ScratchCardClient({
@@ -191,7 +330,9 @@ export default function ScratchCardClient({
   mode = "first",
   initialPhone = "",
   banner,
+  prizes,
 }: ScratchCardClientProps) {
+  const prizeOptions = toPrizeOptions(prizes);
   const router = useRouter();
   const isAdditional = mode === "additional";
   const [fullName, setFullName] = useState("");
@@ -675,64 +816,46 @@ export default function ScratchCardClient({
                         />
                       </div>
 
-                      <div
-                        className={styles.field}
-                        role="radiogroup"
-                        aria-labelledby="sc-prize-label"
-                        aria-invalid={Boolean(errors.prize)}
-                        aria-describedby={
-                          errors.prize ? "sc-prize-error" : undefined
-                        }
-                      >
-                        <span id="sc-prize-label" className={styles.label}>
+                      <div className={styles.field}>
+                        <label
+                          id="sc-prize-label"
+                          htmlFor="sc-prize"
+                          className={styles.label}
+                        >
                           আপনার প্রাপ্ত পুরস্কারটি নির্বাচন করুন{" "}
                           <span className={styles.required} aria-hidden="true">
                             *
                           </span>
-                        </span>
-                        <div className={styles.prizeGrid}>
-                          {PRIZES.map((p, i) => (
-                            <label
-                              key={p.value}
-                              style={
-                                {
-                                  "--prize-from": p.tone[0],
-                                  "--prize-to": p.tone[1],
-                                } as CSSProperties
-                              }
-                              className={`${styles.prizeOption} ${
-                                prize === p.value ? styles.prizeOptionActive : ""
-                              } ${errors.prize ? styles.prizeOptionInvalid : ""}`}
-                            >
-                              <input
-                                id={i === 0 ? "sc-prize" : undefined}
-                                type="radio"
-                                name="prize"
-                                value={p.value}
-                                checked={prize === p.value}
-                                onChange={() => {
-                                  setPrize(p.value);
-                                  clearError("prize");
-                                }}
-                                className={styles.prizeRadio}
-                              />
-                              <span className={styles.prizeIcon}>
-                                <Icon size={22}>{p.icon}</Icon>
-                              </span>
-                              <span className={styles.prizeText}>
-                                <strong>{p.label}</strong>
-                                {p.value}
-                              </span>
-                              {prize === p.value && (
-                                <span className={styles.prizeCheck} aria-hidden="true">
-                                  <Icon size={14}>
-                                    <path d="M5 12.5l4.5 4.5L19 7.5" />
-                                  </Icon>
-                                </span>
-                              )}
-                            </label>
-                          ))}
-                        </div>
+                        </label>
+                        <Select<PrizeOption>
+                          instanceId="sc-prize"
+                          inputId="sc-prize"
+                          options={prizeOptions}
+                          value={prizeOptions.find((p) => p.value === prize) || null}
+                          onChange={(option) => {
+                            setPrize(option?.value || "");
+                            clearError("prize");
+                          }}
+                          getOptionValue={(p) => p.value}
+                          getOptionLabel={(p) => `${p.label} ${p.value}`}
+                          formatOptionLabel={(p) => <PrizeLabel prize={p} />}
+                          placeholder="পুরস্কার খুঁজুন বা নির্বাচন করুন"
+                          noOptionsMessage={() => "কোনো পুরস্কার পাওয়া যায়নি"}
+                          isSearchable
+                          // The form card clips overflow, so the menu renders
+                          // on <body> and flips up when there is no room below.
+                          menuPortalTarget={
+                            typeof document === "undefined" ? null : document.body
+                          }
+                          menuPosition="fixed"
+                          menuPlacement="auto"
+                          maxMenuHeight={320}
+                          aria-invalid={Boolean(errors.prize)}
+                          aria-errormessage={
+                            errors.prize ? "sc-prize-error" : undefined
+                          }
+                          styles={prizeSelectStyles(Boolean(errors.prize))}
+                        />
                         <FieldError
                           id="sc-prize-error"
                           message={errors.prize}

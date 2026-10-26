@@ -6,6 +6,7 @@ import Link from "next/link";
 import MarqueeBanner from "@/components/MarqueeBanner";
 import { apiFetch } from "@/lib/api";
 import type { ApiResponse } from "@/types/api";
+import type { ScratchCardPrize } from "@/services/scratchCardPrizeService";
 import { scratchCardFontClass } from "../fonts";
 import styles from "../ScratchCard.module.css";
 
@@ -19,7 +20,8 @@ interface TrackedClaim {
   updatedAt: string;
 }
 
-const PRIZE_LABELS: Record<string, string> = {
+// Bangla names for prizes no longer in the admin list (or if it fails to load).
+const LEGACY_PRIZE_LABELS: Record<string, string> = {
   TV: "টিভি",
   Fridge: "ফ্রিজ",
   Freeze: "ফ্রিজ",
@@ -44,7 +46,15 @@ function fmtDate(value: string) {
 export default function ScratchCardTrackClient({
   header,
   banner,
-}: Pick<SiteChromeSlots, "header"> & { banner?: ReactNode }) {
+  prizes,
+}: Pick<SiteChromeSlots, "header"> & {
+  banner?: ReactNode;
+  prizes?: ScratchCardPrize[] | null;
+}) {
+  const prizeLabels: Record<string, string> = { ...LEGACY_PRIZE_LABELS };
+  prizes?.forEach((p) => {
+    if (p.nameBn) prizeLabels[p.name] = p.nameBn;
+  });
   const [phone, setPhone] = useState("");
   const [claims, setClaims] = useState<TrackedClaim[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -134,7 +144,7 @@ export default function ScratchCardTrackClient({
                   <div key={claim.Id} className={`${styles.card} ${styles.trackItem}`}>
                     <div className={styles.trackItemHead}>
                       <div>
-                        <p className={styles.trackPrize}>{PRIZE_LABELS[claim.prize] || claim.prize}</p>
+                        <p className={styles.trackPrize}>{prizeLabels[claim.prize] || claim.prize}</p>
                         <p className={styles.trackMeta}>
                           {claim.referenceCode ?? "—"} · {claim.claimType === "repeat" ? "অতিরিক্ত কার্ড" : "প্রথম কার্ড"} · জমা: {fmtDate(claim.createdAt)}
                         </p>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteChrome";
 import ScratchCardBanner from "../ScratchCardBanner";
 import ScratchCardClient from "../ScratchCardClient";
+import { fetchScratchCardPrizes } from "@/services/scratchCardPrizeService";
 
 export const metadata: Metadata = {
   title: "আরেকটি Scratch Card",
@@ -12,7 +13,7 @@ export default async function AnotherScratchCardPage({
 }: {
   searchParams: Promise<{ phone?: string | string[] }>;
 }) {
-  const { phone } = await searchParams;
+  const [{ phone }, prizes] = await Promise.all([searchParams, fetchScratchCardPrizes()]);
   const initialPhone = (Array.isArray(phone) ? phone[0] : phone || "")
     .replace(/\D/g, "")
     .slice(0, 11);
@@ -23,6 +24,7 @@ export default async function AnotherScratchCardPage({
       initialPhone={initialPhone}
       header={<SiteHeader />}
       banner={<ScratchCardBanner />}
+      prizes={prizes}
     />
   );
 }

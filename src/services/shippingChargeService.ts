@@ -8,7 +8,7 @@ export interface ShippingCharge {
 }
 
 // Also the minimum, matching the order API: lower configured charges are raised to these.
-export const DEFAULT_DHAKA_CHARGE = 80;
+export const DEFAULT_DHAKA_CHARGE = 70;
 export const DEFAULT_OUTSIDE_DHAKA_CHARGE = 130;
 
 const toAmount = (value: ShippingCharge["amount"]): number | null => {

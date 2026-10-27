@@ -40,6 +40,13 @@ export interface ApiProduct {
   variants: ApiVariant[] | null;
   sku: string | null;
   freeShipping?: boolean | string | number;
+  prizes?: ApiPrize[];
+  slug?: string | null;
+  brand?: string | null;
+  productVideo?: string | null;
+  metaTitle?: string | null;
+  metaKeyword?: string | null;
+  metaDescription?: string | null;
   inStock: boolean;
 }
 
@@ -53,6 +60,13 @@ export interface ApiVariant {
   stock: number;
   availability?: string | null;
   inStock: boolean;
+}
+
+export interface ApiPrize {
+  Id: number;
+  name: string;
+  nameBn?: string | null;
+  image?: string | null;
 }
 
 export interface ApiProductOption {
@@ -103,6 +117,9 @@ export interface ApiAccountInfo {
 
 export interface ApiOrder {
   Id: number;
+  /** Set by POST /orders for the browser copy of the server-side Purchase. */
+  purchaseEventId?: string;
+  purchaseTracking?: import("@/lib/pixel").PurchaseTracking;
   orderId?: string;
   invoiceId?: string;
   accountInfo?: ApiAccountInfo;

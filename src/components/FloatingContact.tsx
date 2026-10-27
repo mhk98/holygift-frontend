@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { fetchSiteSettings, type SiteSetting } from "@/services/settingService";
-import { trackPixelEvent } from "@/lib/pixel";
 
 const CONTACT_DEFS = [
   {
@@ -54,17 +53,6 @@ interface Props {
   settings?: Partial<SiteSetting> | null;
 }
 
-function trackContact(label: string, value: string) {
-  trackPixelEvent("Contact", {
-    content_ids: [],
-    content_name: label,
-    content_type: "contact",
-    value: 0,
-    currency: "BDT",
-    num_items: 1,
-  }, { phone: value });
-}
-
 export default function FloatingContact({ settings }: Props) {
   const [open, setOpen] = useState(false);
   const [resolvedSettings, setResolvedSettings] = useState<Partial<SiteSetting> | null>(settings || null);
@@ -103,7 +91,6 @@ export default function FloatingContact({ settings }: Props) {
               href={c.href}
               target={c.href.startsWith("http") ? "_blank" : undefined}
               rel={c.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              onClick={() => trackContact(c.label, c.href)}
               className="flex items-center gap-2.5 bg-white shadow-md hover:shadow-lg transition-shadow"
               style={{ borderRadius: 50, padding: "7px 16px 7px 7px", border: "1px solid #eee" }}
             >

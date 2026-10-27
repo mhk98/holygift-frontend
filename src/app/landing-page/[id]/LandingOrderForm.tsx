@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCheckoutSession } from "@/lib/useCheckoutSession";
 import { createOrder, saveIncompleteOrder } from "@/services/orderService";
-import { getPixelClickData, trackPixelEvent, type PixelUserData } from "@/lib/pixel";
+import { getPixelClickData, trackAddToCart, trackInitiateCheckout, trackPurchase, trackViewContent, type TrackItem } from "@/lib/pixel";
 import type { CreateOrderPayload } from "@/types/api";
 
 export interface LandingOrderOption {
@@ -98,9 +98,6 @@ export default function LandingOrderForm({
   const [deviceId, setDeviceId] = useState("");
   const checkout = useCheckoutSession();
   const router = useRouter();
-  const addToCartTrackedRef = useRef(false);
-  const beginCheckoutTrackedRef = useRef(false);
-  const leadTrackedOrderIdRef = useRef<number | undefined>(undefined);
 
   // Matches the server: delivery is free only when every selected product ships free.
   const allFreeShipping =
@@ -115,50 +112,32 @@ export default function LandingOrderForm({
     [selected],
   );
   const total = subtotal + deliveryCharge;
-  const pixelData = useMemo(() => {
-    const items = selected.length
-      ? selected
-      : options.slice(0, 1).map((item) => ({ ...item, qty: 1 }));
-    return {
-      content_ids: items.map((item) => item.productId || item.id),
-      content_name: items.map((item) => item.name).join(", ") || title,
-      content_type: "product",
-      value:
-        items.reduce((sum, item) => sum + item.price * item.qty, 0) ||
-        subtotal ||
-        0,
-      currency: "BDT",
-      num_items:
-        items.reduce((sum, item) => sum + item.qty, 0) || items.length || 1,
-    };
-  }, [options, selected, subtotal, title]);
-
-  const trackLandingEvent = (
-    eventName: string,
-    value = pixelData.value,
-    orderId?: string | number,
-    userData?: PixelUserData,
-  ) => {
-    trackPixelEvent(eventName, { ...pixelData, value, order_id: orderId }, userData);
-  };
-
-  const trackAddToCartOnce = () => {
-    if (addToCartTrackedRef.current) return;
-    addToCartTrackedRef.current = true;
-    trackLandingEvent("AddToCart");
-  };
-
-  const trackBeginCheckoutOnce = () => {
-    trackAddToCartOnce();
-    if (beginCheckoutTrackedRef.current) return;
-    beginCheckoutTrackedRef.current = true;
-    trackLandingEvent("InitiateCheckout", total);
-  };
-
   useEffect(() => {
     setDeviceId(getLandingDeviceId());
-    trackLandingEvent("ViewContent");
   }, []);
+
+  // Landing offers are tracked under their linked product with the offer price.
+  const trackItem = (item: LandingOrderOption, quantity: number): TrackItem => ({
+    id: item.productId || landingId,
+    name: item.name,
+    price: item.price,
+    quantity,
+  });
+  const viewTracked = useRef(false);
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (viewTracked.current || !options[0]) return;
+    viewTracked.current = true;
+    trackViewContent(trackItem(options[0], 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options]);
+
+  // Fires the first time the visitor starts filling in the order form.
+  const trackCheckoutOnce = () => {
+    if (checkoutTracked.current || !selected.length) return;
+    checkoutTracked.current = true;
+    trackInitiateCheckout(selected.map((item) => trackItem(item, item.qty)));
+  };
   const labels = {
     productSelectTitle: textValue(
       orderForm,
@@ -208,7 +187,7 @@ export default function LandingOrderForm({
   };
 
   function toggleOption(option: LandingOrderOption) {
-    trackAddToCartOnce();
+    if (!selected.some((item) => item.id === option.id)) trackAddToCart(trackItem(option, 1));
     setSelected((current) => {
       if (current.some((item) => item.id === option.id)) {
         const next = current.filter((item) => item.id !== option.id);
@@ -219,7 +198,8 @@ export default function LandingOrderForm({
   }
 
   function changeQty(id: string, delta: number) {
-    trackAddToCartOnce();
+    const item = selected.find((entry) => entry.id === id);
+    if (item && delta > 0) trackAddToCart(trackItem(item, delta));
     setSelected((current) =>
       current.map((item) =>
         item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item,
@@ -235,13 +215,6 @@ export default function LandingOrderForm({
         buildPayload("incomplete", normalizedPhone, nextCustomer),
       );
       setDraftId(draft.Id);
-      if (draft.Id && leadTrackedOrderIdRef.current !== draft.Id) {
-        leadTrackedOrderIdRef.current = draft.Id;
-        trackLandingEvent("Lead", total, undefined, {
-          name: nextCustomer.name.trim(),
-          phone: normalizedPhone,
-        });
-      }
     } catch {
       // Draft capture is best-effort; final order still shows the user-facing error.
     }
@@ -321,14 +294,12 @@ export default function LandingOrderForm({
       return;
     }
 
+    trackCheckoutOnce();
     checkout.submitting.current = true;
     setSaving(true);
-    trackBeginCheckoutOnce();
-    const pixelUser = { name: customer.name.trim(), phone: normalizedPhone };
-    trackLandingEvent("AddPaymentInfo", total, undefined, pixelUser);
     try {
       const order = await createOrder(buildPayload("pending", normalizedPhone));
-      trackLandingEvent("Purchase", total, order.Id, pixelUser);
+      trackPurchase(order.purchaseTracking);
       // invoiceId is the display number (HD-xxxx); orderId is the raw stored value.
       const invoiceId = order.invoiceId || order.orderId || String(order.Id);
       // Same hand-off as the cart checkout, so /order-success and re-confirm work alike.
@@ -359,7 +330,7 @@ export default function LandingOrderForm({
     <section
       id="order-now"
       className="bg-slate-100 px-4 py-20"
-      onFocusCapture={trackBeginCheckoutOnce}
+      onFocusCapture={trackCheckoutOnce}
     >
       <div className="mx-auto max-w-5xl rounded-md border-2 border-[#05a925] bg-white p-6 shadow-sm md:p-8">
         <h2 className="text-center text-3xl font-black leading-tight text-slate-800 md:text-4xl">

@@ -80,6 +80,18 @@ function mapToProduct(item: ApiProduct): Product {
     features: item.features || [],
     sku: item.sku ?? null,
     freeShipping: toBoolean(item.freeShipping),
+    prizes: (Array.isArray(item.prizes) ? item.prizes : []).map((prize) => ({
+      id: Number(prize.Id),
+      name: prize.name,
+      nameBn: prize.nameBn ?? null,
+      image: prize.image ? toImgUrl(prize.image) : null,
+    })),
+    slug: item.slug || null,
+    brand: item.brand || null,
+    productVideo: item.productVideo || null,
+    metaTitle: item.metaTitle || null,
+    metaKeyword: item.metaKeyword || null,
+    metaDescription: item.metaDescription || null,
     hasVariants: variants.length > 1,
     priceMin: Number(item.price_min ?? discountedPrice),
     priceMax: Number(item.price_max ?? discountedPrice),
@@ -94,8 +106,9 @@ function mapToProduct(item: ApiProduct): Product {
 
 // Returns null only when the product does not exist; network/server errors
 // throw so a cached product page is kept instead of being replaced by a 404.
-export async function fetchProductById(id: number): Promise<Product | null> {
-  const res = await fetch(`${BASE}/product/storefront/${id}`, { next: { revalidate: 60 }, signal: AbortSignal.timeout(15_000) } as RequestInit);
+// `id` may also be the product slug.
+export async function fetchProductById(id: number | string): Promise<Product | null> {
+  const res = await fetch(`${BASE}/product/storefront/${encodeURIComponent(String(id))}`, { next: { revalidate: 60 }, signal: AbortSignal.timeout(15_000) } as RequestInit);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch product ${id}: ${res.status}`);
   const json = await res.json();

@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import MarqueeBanner from "@/components/MarqueeBanner";
 import Header from "@/components/Header";
 import HeroBanner from "@/components/HeroBanner";
 import PopupBanner from "@/components/PopupBanner";
 import TopCategories from "@/components/TopCategories";
+import CategoryHero from "@/components/CategoryHero";
 import ProductSection from "@/components/ProductSection";
 import BrandsSection from "@/components/BrandsSection";
 import { SiteFooter } from "@/components/SiteChrome";
@@ -14,7 +14,7 @@ import { fetchStorefrontProducts } from "@/services/productService";
 import { fetchSiteSettings, type SiteSetting } from "@/services/settingService";
 import { fetchBanners } from "@/services/bannerService";
 import { fetchBrands } from "@/services/brandService";
-import { fetchCategoryMenus, fetchNavItems, type CategoryMenuItem } from "@/services/menuService";
+import { fetchCategoryBanner, fetchCategoryMenus, fetchNavItems, type CategoryBanner, type CategoryMenuItem } from "@/services/menuService";
 import type { NavItem, Product } from "@/data/products";
 import type { BannerItem } from "@/services/bannerService";
 import type { BrandItem } from "@/services/brandService";
@@ -84,6 +84,9 @@ export default async function Home({
   }
 
   const isFiltered = Boolean(menu);
+  const categoryBanner: CategoryBanner | null = menu
+    ? await fetchCategoryBanner(menu).catch(() => null)
+    : null;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -94,15 +97,14 @@ export default async function Home({
         {!isFiltered && <PopupBanner banners={banners.popupBanners} />}
         {!isFiltered && <TopCategories items={categoryMenus} />}
 
-        {isFiltered && (
-          <div style={{ width: "90%", margin: "16px auto 0" }}>
-            <Link
-              href="/"
-              style={{ fontSize: 13, color: "#404040", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
-            >
-              ← সব পণ্য দেখুন
-            </Link>
-          </div>
+        {isFiltered && menu && (
+          <CategoryHero
+            name={menu}
+            sub={sub}
+            child={child}
+            bannerImage={categoryBanner?.imageUrl}
+            bannerTitle={categoryBanner?.title}
+          />
         )}
 
         {sections.length > 0 ? (

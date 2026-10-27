@@ -10,6 +10,13 @@ interface ApiMenuItem {
   isActive: boolean;
   imageFile?: string | null;
   image?: string | null;
+  bannerImage?: string | null;
+  bannerTitle?: string | null;
+}
+
+export interface CategoryBanner {
+  imageUrl: string | null;
+  title: string | null;
 }
 
 export interface CategoryMenuItem {
@@ -86,6 +93,16 @@ const fetchPublicMenus = cache(async (): Promise<ApiMenuItem[]> => {
 export async function fetchNavItems(): Promise<NavItem[]> {
   const items = await fetchPublicMenus();
   return items.map((m) => ({ label: m.label, sub: normalizeSubItems(m.subItems) }));
+}
+
+// Banner shown at the top of a category page, matched by category name.
+export async function fetchCategoryBanner(name: string): Promise<CategoryBanner | null> {
+  const items = await fetchPublicMenus();
+  const match = items.find((m) => m.label?.toLowerCase() === name.toLowerCase());
+  if (!match) return null;
+  const imageUrl = toImageUrl(match.bannerImage);
+  const title = match.bannerTitle?.trim() || null;
+  return imageUrl || title ? { imageUrl, title } : null;
 }
 
 // Returns public category menu items with their admin-managed images.

@@ -6,6 +6,7 @@ import { Product } from "@/data/products";
 import { useCart } from "@/context/CartContext";
 import { useVariantSelection } from "@/lib/useVariantSelection";
 import VariantSelector from "@/components/VariantSelector";
+import { trackAddToCart } from "@/lib/pixel";
 
 interface OrderModalProps {
   product: Product;
@@ -24,6 +25,7 @@ export default function OrderModal({ product, onClose }: OrderModalProps) {
   const handleOrder = () => {
     if (!canBuy) return;
     addToCart(product, qty, selection.selectedVariant);
+    trackAddToCart({ id: product.id, name: product.name, price: selection.newPrice, quantity: qty });
     onClose();
     router.push("/checkout");
   };

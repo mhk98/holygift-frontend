@@ -1,0 +1,70 @@
+.wrap {
+  width: 90%;
+  margin: 18px auto 8px;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #737373;
+}
+.crumbItem { display: inline-flex; align-items: center; gap: 6px; }
+.crumbLink {
+  color: #737373;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.crumbLink:hover { color: #111; }
+.crumbCurrent { color: #111; font-weight: 600; }
+.sep { color: #c4c4c4; }
+
+.hero {
+  overflow: hidden;
+  border-radius: 18px;
+  background: #e5e5e5;
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.25);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px 12px;
+  text-align: center;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a3;
+}
+.title {
+  margin: 0;
+  max-width: 900px;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+
+@media (max-width: 767px) {
+  .hero { border-radius: 14px; }
+  .details { padding-top: 16px; }
+  .title { font-size: 26px; }
+}

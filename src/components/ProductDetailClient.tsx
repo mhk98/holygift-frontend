@@ -291,16 +291,16 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SafeImage from "@/components/SafeImage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Product } from "@/data/products";
 import { useCart } from "@/context/CartContext";
-import { useCustomer } from "@/context/CustomerContext";
 import { useVariantSelection } from "@/lib/useVariantSelection";
 import VariantSelector from "@/components/VariantSelector";
-import { trackPixelEvent } from "@/lib/pixel";
+import { youtubeId } from "@/lib/productUrl";
+import { trackAddToCart, trackViewContent } from "@/lib/pixel";
 import {
   fetchProductReviews,
   type ProductReview,
@@ -325,9 +325,9 @@ export default function ProductDetailClient({
 }: Props) {
   const router = useRouter();
   const { addToCart } = useCart();
-  const { customer } = useCustomer();
 
   const allImages = [...new Set([product.image, ...(product.gallery || [])].filter(Boolean))];
+  const videoId = youtubeId(product.productVideo);
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [qty, setQty] = useState(1);
@@ -351,6 +351,17 @@ export default function ProductDetailClient({
       ? Math.round(((selectedOldPrice - selectedNewPrice) / selectedOldPrice) * 100)
       : 0;
 
+  // One ViewContent per product shown, not per re-render or variant change.
+  const viewTrackedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (viewTrackedFor.current === product.id) return;
+    viewTrackedFor.current = product.id;
+    trackViewContent(
+      { id: product.id, name: product.name, price: product.discountedPrice, quantity: 1 },
+      product.category,
+    );
+  }, [product.id, product.name, product.discountedPrice, product.category]);
+
   useEffect(() => {
     let active = true;
     fetchProductReviews(product).then((items) => {
@@ -367,43 +378,13 @@ export default function ProductDetailClient({
     return total / reviews.length;
   }, [reviews]);
 
-  const pixelUserData = useMemo(
-    () => customer
-      ? { customerId: customer.Id, name: customer.name, phone: customer.phone }
-      : undefined,
-    [customer?.Id, customer?.name, customer?.phone],
-  );
-
-  useEffect(() => {
-    trackPixelEvent(
-      "ViewContent",
-      {
-        content_ids: [product.id],
-        content_name: product.name,
-        content_type: "product",
-        value: selectedNewPrice,
-        currency: "BDT",
-        num_items: 1,
-      },
-      pixelUserData,
-    );
-  }, [pixelUserData, product.id, product.name, selectedNewPrice]);
+  const trackAdded = () =>
+    trackAddToCart({ id: product.id, name: product.name, price: selectedNewPrice, quantity: qty });
 
   const handleAddToCart = () => {
     if (!canBuy) return;
     addToCart(product, qty, selection.selectedVariant);
-    trackPixelEvent(
-      "AddToCart",
-      {
-        content_ids: [product.id],
-        content_name: product.name,
-        content_type: "product",
-        value: selectedNewPrice * qty,
-        currency: "BDT",
-        num_items: qty,
-      },
-      pixelUserData,
-    );
+    trackAdded();
     setAddedMsg(true);
     setTimeout(() => setAddedMsg(false), 1500);
   };
@@ -411,6 +392,7 @@ export default function ProductDetailClient({
   const handleOrderNow = () => {
     if (!canBuy) return;
     addToCart(product, qty, selection.selectedVariant);
+    trackAdded();
     router.push("/checkout");
   };
 
@@ -507,6 +489,13 @@ export default function ProductDetailClient({
         >
           {product.name}
         </h1>
+
+        {product.brand && (
+          <p style={{ margin: "-0.5rem 0 1rem", fontSize: 14, color: "#6b7280" }}>
+            Brand:{" "}
+            <span style={{ fontWeight: 700, color: "#111827" }}>{product.brand}</span>
+          </p>
+        )}
 
         <div
           style={{ marginBottom: "1rem" }}
@@ -613,6 +602,52 @@ export default function ProductDetailClient({
         )}
       </div>
     </div>
+      {videoId && (
+        <section
+          style={{
+            marginTop: 24,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            padding: "24px 26px",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 20,
+              fontWeight: 800,
+              color: "#111827",
+              marginBottom: 16,
+              paddingBottom: 12,
+              borderBottom: `2px solid ${SECONDARY}`,
+            }}
+          >
+            Product Video
+          </h2>
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: 860,
+              margin: "0 auto",
+              aspectRatio: "16 / 9",
+              borderRadius: 8,
+              overflow: "hidden",
+              background: "#000",
+            }}
+          >
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+              title={`${product.name} video`}
+              loading="lazy"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+            />
+          </div>
+        </section>
+      )}
+
       {product.description && (
         <section
           style={{

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { sendReconfirmOtp, verifyReconfirmOtp } from "@/services/orderService";
-import { trackPixelEvent } from "@/lib/pixel";
 
 type PendingOrder = {
   orderId: string;
@@ -103,24 +102,10 @@ function ReConfirmContent({ header, footer }: SiteChromeSlots) {
     setVerifying(true);
     setError("");
     try {
-      const confirmedOrder = await verifyReconfirmOtp(
+      await verifyReconfirmOtp(
         order.orderId,
         order.phone,
         otp.trim(),
-      );
-      trackPixelEvent(
-        "Purchase",
-        {
-          content_ids: confirmedOrder.items?.map((item) => item.id) || [],
-          content_name: "Order Re-Confirmed",
-          content_type: "product",
-          value: confirmedOrder.total || order.total,
-          currency: "BDT",
-          num_items:
-            confirmedOrder.items?.reduce((sum, item) => sum + item.qty, 0) || 0,
-          order_id: order.orderId,
-        },
-        { name: confirmedOrder.customerName || order.name, phone: order.phone },
       );
       handleConfirmed();
     } catch (err) {

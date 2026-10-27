@@ -16,6 +16,7 @@ interface TrackedClaim {
   prize: string;
   status: string;
   claimType: "first" | "repeat";
+  note: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +38,7 @@ const STATUS_META: Record<string, { label: string; text: string; tone: string }>
   "In Transit": { label: "পথে আছে", text: "পুরস্কার পাঠানো হয়েছে, শীঘ্রই আপনার কাছে পৌঁছাবে।", tone: "#7c3aed" },
   Rejected: { label: "বাতিল", text: "কার্ডটি যাচাইয়ে বাতিল হয়েছে। বিস্তারিত জানতে আমাদের সাথে যোগাযোগ করুন।", tone: "#dc2626" },
   Delivered: { label: "ডেলিভারি হয়েছে", text: "পুরস্কার আপনার কাছে পাঠানো হয়েছে।", tone: "#16a34a" },
+  "Not Responding": { label: "Not Responding", text: "আপনাকে ফোন করা হয়েছে। আপনি ফোন রিসিভ করেন নি।", tone: "#6b7280" },
 };
 
 function fmtDate(value: string) {
@@ -157,6 +159,9 @@ export default function ScratchCardTrackClient({
                       </span>
                     </div>
                     {meta.text && <p className={styles.trackNote}>{meta.text}</p>}
+                    {claim.status === "Rejected" && claim.note && (
+                      <p className={styles.trackNote}>কারণ: {claim.note}</p>
+                    )}
                   </div>
                 );
               })}

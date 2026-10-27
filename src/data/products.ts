@@ -13,6 +13,15 @@ export interface Product {
   features?: string[];
   sku?: string | null;
   freeShipping?: boolean;
+  slug?: string | null;
+  brand?: string | null;
+  /** YouTube URL set in the admin. */
+  productVideo?: string | null;
+  metaTitle?: string | null;
+  metaKeyword?: string | null;
+  metaDescription?: string | null;
+  /** Scratch card prizes given away with this product. */
+  prizes?: ProductPrize[];
   /** True when the customer must pick a variant (more than one to choose from). */
   hasVariants?: boolean;
   priceMin?: number;
@@ -23,6 +32,13 @@ export interface Product {
   category?: string | null;
   subCategory?: string | null;
   childCategory?: string | null;
+}
+
+export interface ProductPrize {
+  id: number;
+  name: string;
+  nameBn?: string | null;
+  image?: string | null;
 }
 
 export interface ProductVariant {

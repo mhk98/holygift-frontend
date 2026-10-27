@@ -2,73 +2,50 @@ declare global {
   interface Window {
     fbq: ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; };
     _fbq: unknown;
-    ttq?: { track?: (...args: unknown[]) => void; page?: () => void; instance?: (pixelCode: string) => { track?: (...args: unknown[]) => void } };
-    gtag?: (...args: unknown[]) => void;
-    dataLayer: unknown[];
-    __googleAdsConfigs?: { conversionId: string; conversionLabel?: string | null }[];
   }
 }
 
 import { BASE } from "@/lib/api";
 
-export interface PixelUserData {
-  customerId?: number;
+// Meta Pixel (browser) + Conversions API (server) tracking.
+//
+// Every event is fired in the browser with an eventID and posted to
+// /tracking/events with the same id, so Meta keeps one of the two copies.
+// Purchase is the exception: the backend sends it from the saved order, and the
+// browser only fires its copy with the event id and values the order API returns.
+
+const CURRENCY = "BDT";
+
+export interface TrackItem {
+  id: string | number;
   name?: string;
-  phone?: string;
-  email?: string;
+  price: number;
+  quantity: number;
 }
 
-export interface PixelProductData {
-  content_ids: (string | number)[];
-  content_name: string;
-  content_type: string;
+/** Purchase data returned by POST /orders (calculated on the server). */
+export interface PurchaseTracking {
+  eventId: string;
+  order_id: string;
   value: number;
   currency: string;
-  num_items?: number;
-  order_id?: string | number;
+  content_type: string;
+  content_ids: string[];
+  contents: { id: string; quantity: number; item_price: number }[];
+  content_name?: string;
+  num_items: number;
 }
 
-// Meta standard events — everything else goes through trackCustom
-const STANDARD_EVENTS = new Set([
-  "PageView", "ViewContent", "Search", "AddToCart", "AddToWishlist",
-  "InitiateCheckout", "AddPaymentInfo", "Purchase", "Lead", "Contact", "CompleteRegistration",
-]);
+// ---------------------------------------------------------------------------
+// First-party Meta identifiers (_fbp / _fbc)
+// ---------------------------------------------------------------------------
 
-const TIKTOK_EVENT_NAMES: Record<string, string> = {
-  PageView: "Pageview",
-  ViewContent: "ViewContent",
-  Search: "Search",
-  AddToCart: "AddToCart",
-  InitiateCheckout: "InitiateCheckout",
-  AddPaymentInfo: "AddPaymentInfo",
-  Lead: "SubmitForm",
-  Contact: "Contact",
-  Purchase: "CompletePayment",
-};
+const FBC_MAX_AGE_S = 90 * 24 * 60 * 60;
 
-const GOOGLE_EVENT_NAMES: Record<string, string> = {
-  ViewContent: "view_item",
-  Search: "search",
-  AddToCart: "add_to_cart",
-  InitiateCheckout: "begin_checkout",
-  AddPaymentInfo: "add_payment_info",
-  Lead: "generate_lead",
-  Contact: "contact",
-  Purchase: "purchase",
-};
-
-function eventId(eventName: string, orderId?: string | number) {
-  // Order-based id lets Meta/TikTok dedupe repeated Purchase hits for the same order
-  if (orderId !== undefined && orderId !== "") return `${eventName}.${orderId}`;
-  return `${eventName}.${Date.now()}.${Math.random().toString(16).slice(2)}`;
-}
-
-function cookie(name: string) {
+function readCookie(name: string) {
   if (typeof document === "undefined") return "";
-  return document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`))
-    ?.split("=")[1] || "";
+  const row = document.cookie.split("; ").find((item) => item.startsWith(`${name}=`));
+  return row ? decodeURIComponent(row.slice(name.length + 1)) : "";
 }
 
 function param(name: string) {
@@ -76,140 +53,153 @@ function param(name: string) {
   return new URLSearchParams(window.location.search).get(name) || "";
 }
 
-export function getPixelClickData() {
-  const fbclid = param("fbclid");
+/**
+ * Stores fbclid from a Meta ad click as _fbc (fb.1.<first-seen ms>.<fbclid>).
+ * The same fbclid keeps its original timestamp; nothing is written without a real fbclid.
+ */
+export function captureFbclid() {
+  const fbclid = param("fbclid").trim();
+  if (!fbclid || !/^[\w-]{10,500}$/.test(fbclid)) return;
+  const existing = readCookie("_fbc");
+  if (existing.split(".").slice(3).join(".") === fbclid) return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `_fbc=fb.1.${Date.now()}.${fbclid}; Max-Age=${FBC_MAX_AGE_S}; Path=/; SameSite=Lax${secure}`;
+}
+
+function attribution() {
   return {
-    fbp: cookie("_fbp") || undefined,
-    fbc: cookie("_fbc") || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : undefined),
-    ttp: cookie("_ttp") || undefined,
-    ttclid: param("ttclid") || undefined,
-    gclid: param("gclid") || undefined,
-    gbraid: param("gbraid") || undefined,
-    wbraid: param("wbraid") || undefined,
+    fbp: readCookie("_fbp") || undefined,
+    fbc: readCookie("_fbc") || undefined,
   };
 }
 
-// Pixels are initialised only after /tracking/config loads (MetaPixel.tsx). Events fired
-// earlier — e.g. ViewContent on mount — are held here so the browser side isn't lost.
+/** Attribution saved with an order; the server re-validates every field. */
+export function getPixelClickData() {
+  captureFbclid();
+  return {
+    ...attribution(),
+    eventSourceUrl: typeof window === "undefined" ? undefined : window.location.href,
+    gclid: param("gclid") || undefined,
+    gbraid: param("gbraid") || undefined,
+    wbraid: param("wbraid") || undefined,
+    ttclid: param("ttclid") || undefined,
+    ttp: readCookie("_ttp") || undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Browser pixel
+// ---------------------------------------------------------------------------
+
+// Pixels are initialised once /tracking/config loads (MetaPixel.tsx). Events
+// fired earlier — e.g. ViewContent on mount — wait here instead of being lost.
 let pixelsReady = false;
+let pixelIds: string[] = [];
 const pendingBrowserEvents: (() => void)[] = [];
+
+export function markPixelsReady(ids: string[] = []) {
+  pixelIds = ids;
+  pixelsReady = true;
+  pendingBrowserEvents.splice(0).forEach((send) => send());
+}
 
 function runWhenPixelsReady(send: () => void) {
   if (pixelsReady) send();
   else pendingBrowserEvents.push(send);
 }
 
-export function markPixelsReady() {
-  pixelsReady = true;
-  pendingBrowserEvents.splice(0).forEach((send) => send());
+// trackSingle sends to each configured pixel explicitly, never to a pixel some
+// other script initialised on the page.
+function fireBrowser(eventName: string, eventId: string, customData?: Record<string, unknown>) {
+  runWhenPixelsReady(() => {
+    if (typeof window.fbq !== "function") return;
+    pixelIds.forEach((id) => window.fbq("trackSingle", id, eventName, customData || {}, { eventID: eventId }));
+  });
 }
 
-function currentUrl() {
-  if (typeof window === "undefined") return "";
-  return window.location.href;
+// ---------------------------------------------------------------------------
+// Server copy
+// ---------------------------------------------------------------------------
+
+function newEventId(prefix: string) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  return `${prefix}_${random}`;
 }
 
-function sendServerEvent(
-  eventName: string,
-  id: string,
-  data: Partial<PixelProductData>,
-  userData?: PixelUserData,
-) {
+function sendServer(eventName: string, eventId: string, customData?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  // A logged-in customer's token lets the server add their account details for matching.
+  let token: string | null = null;
+  try { token = window.localStorage.getItem("customer_token"); } catch { /* storage blocked */ }
   fetch(`${BASE}/tracking/events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       eventName,
-      eventId: id,
-      eventSourceUrl: currentUrl(),
-      referrerUrl: typeof document === "undefined" ? undefined : document.referrer || undefined,
-      customData: data,
-      userData: {
-        ...userData,
-        ...getPixelClickData(),
-      },
+      eventId,
+      eventSourceUrl: window.location.href,
+      attribution: attribution(),
+      customData,
     }),
     keepalive: true,
   }).catch(() => {});
 }
 
-export function trackPixelEvent(
-  eventName: string,
-  data: PixelProductData,
-  userData?: PixelUserData
-) {
+function track(eventName: string, prefix: string, customData?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
-
-  const id = eventId(eventName, eventName === "Purchase" ? data.order_id : undefined);
-  // Name/phone go only to the server (hashed there) — Meta flags raw PII in browser custom data.
-  const payload: Record<string, unknown> = { ...data };
-  if (userData?.customerId) payload.customer_id = userData.customerId;
-
-  runWhenPixelsReady(() => sendBrowserEvent(eventName, id, data, payload));
-  sendServerEvent(eventName, id, data, userData);
+  captureFbclid();
+  const eventId = newEventId(prefix);
+  fireBrowser(eventName, eventId, customData);
+  sendServer(eventName, eventId, customData);
 }
 
-function sendBrowserEvent(
-  eventName: string,
-  id: string,
-  data: PixelProductData,
-  payload: Record<string, unknown>,
-) {
-  if (typeof window.fbq === "function") {
-    const method = STANDARD_EVENTS.has(eventName) ? "track" : "trackCustom";
-    window.fbq(method, eventName, payload, { eventID: id });
-  }
+const round = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
 
-  window.ttq?.track?.(TIKTOK_EVENT_NAMES[eventName] || eventName, { ...payload, event_id: id });
-
-  if (typeof window.gtag === "function") {
-    const googleEventName = GOOGLE_EVENT_NAMES[eventName];
-    if (googleEventName) {
-      window.gtag("event", googleEventName, {
-        value: data.value,
-        currency: data.currency,
-        ...(data.order_id !== undefined ? { transaction_id: String(data.order_id) } : {}),
-        items: data.content_ids.map((item) => ({
-          item_id: String(item),
-          item_name: data.content_name,
-          quantity: data.num_items || 1,
-        })),
-      });
-    }
-  }
-
-  if (typeof window.gtag === "function" && eventName === "Purchase") {
-    window.__googleAdsConfigs
-      ?.filter((item) => item.conversionId && item.conversionLabel)
-      .forEach((googleConfig) => window.gtag?.("event", "conversion", {
-      send_to: `${googleConfig.conversionId}/${googleConfig.conversionLabel}`,
-      value: data.value,
-      currency: data.currency,
-      transaction_id: String(data.order_id ?? id),
-      }));
-  }
+function itemsData(items: TrackItem[]) {
+  const contents = items
+    .filter((item) => item.id !== undefined && item.id !== null && item.quantity > 0)
+    .map((item) => ({ id: String(item.id), quantity: item.quantity, item_price: round(item.price) }));
+  return {
+    content_type: "product",
+    content_ids: contents.map((item) => item.id),
+    contents,
+    content_name: items.map((item) => item.name).filter(Boolean).join(", ").slice(0, 200) || undefined,
+    value: round(contents.reduce((sum, item) => sum + item.item_price * item.quantity, 0)),
+    currency: CURRENCY,
+  };
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export function trackPageView() {
-  if (typeof window === "undefined") return;
+  track("PageView", "pv");
+}
 
-  const id = eventId("PageView");
-  const pageLocation = currentUrl();
+export function trackViewContent(item: TrackItem, category?: string | null) {
+  track("ViewContent", "vc", { ...itemsData([item]), content_category: category || undefined });
+}
 
-  runWhenPixelsReady(() => {
-    if (typeof window.fbq === "function") {
-      window.fbq("track", "PageView", {}, { eventID: id });
-    }
+/** Call only after the item was actually added to the cart. */
+export function trackAddToCart(item: TrackItem) {
+  track("AddToCart", "atc", itemsData([item]));
+}
 
-    window.ttq?.page?.();
+export function trackInitiateCheckout(items: TrackItem[]) {
+  if (!items.length) return;
+  const data = itemsData(items);
+  track("InitiateCheckout", "ic", { ...data, num_items: data.contents.reduce((sum, item) => sum + item.quantity, 0) });
+}
 
-    if (typeof window.gtag === "function") {
-      window.gtag("event", "page_view", {
-        page_location: pageLocation,
-        page_referrer: document.referrer || undefined,
-      });
-    }
-  });
-
-  sendServerEvent("PageView", id, {});
+/** Browser copy of the server-side Purchase; ids and values come from the order API. */
+export function trackPurchase(purchase: PurchaseTracking | null | undefined) {
+  if (typeof window === "undefined" || !purchase?.eventId) return;
+  const { eventId, ...customData } = purchase;
+  fireBrowser("Purchase", eventId, customData);
 }

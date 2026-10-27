@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useCheckoutSession } from "@/lib/useCheckoutSession";
 import SafeImage from "@/components/SafeImage";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
+import { useCart, type CartItem } from "@/context/CartContext";
+import { fetchProductById } from "@/services/productService";
+import type { ProductPrize } from "@/data/products";
 import { createOrder, saveIncompleteOrder } from "@/services/orderService";
 import { fetchSiteSettings, type SiteSetting } from "@/services/settingService";
 import {
@@ -12,7 +14,7 @@ import {
   getDeliveryChargeForDistrict,
   type ShippingCharge,
 } from "@/services/shippingChargeService";
-import { getPixelClickData, trackPixelEvent } from "@/lib/pixel";
+import { getPixelClickData, trackInitiateCheckout, trackPurchase } from "@/lib/pixel";
 import { validateCoupon, type AppliedCoupon } from "@/services/couponService";
 
 const fmt = (v: number) => v.toLocaleString("en-US");
@@ -50,10 +52,45 @@ function getCouponErrorMessage(error: unknown) {
   return message || "কুপন প্রযোজ্য নয়।";
 }
 
+// Prizes come from the live product, not the saved cart, so admin changes show up.
+function useCartPrizes(items: CartItem[]) {
+  const [prizes, setPrizes] = useState<Map<number, ProductPrize[]>>(new Map());
+  const idsKey = [...new Set(items.map((item) => item.id))].sort().join(",");
+
+  useEffect(() => {
+    if (!idsKey) return;
+    let active = true;
+    Promise.all(
+      idsKey.split(",").map(Number).map((id) =>
+        fetchProductById(id)
+          .catch(() => null)
+          .then((product) => [id, product?.prizes || []] as const),
+      ),
+    ).then((entries) => {
+      if (active) setPrizes(new Map(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [idsKey]);
+
+  return prizes;
+}
+
+const prizeName = (prize: ProductPrize) => prize.nameBn || prize.name;
+
 function CheckoutContent({ header, footer }: SiteChromeSlots) {
   const checkout = useCheckoutSession();
   const router = useRouter();
   const { items, removeFromCart, updateQty, clearCart, totalPrice } = useCart();
+  const prizesByProduct = useCartPrizes(items);
+  const orderPrizes = [
+    ...new Map(
+      items
+        .flatMap((item) => prizesByProduct.get(item.id) || [])
+        .map((prize) => [prize.id, prize] as const),
+    ).values(),
+  ];
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -76,8 +113,6 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
     null,
   );
   const [deviceId, setDeviceId] = useState("");
-  const beginCheckoutTrackedRef = useRef(false);
-  const leadTrackedOrderIdRef = useRef<number | null>(null);
 
   const allItemsFreeShipping =
     items.length > 0 && items.every((item) => item.freeShipping === true);
@@ -129,18 +164,13 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
     setDeviceId(getCheckoutDeviceId());
   }, []);
 
+  // Once per checkout visit, as soon as the saved cart has loaded.
+  const checkoutTracked = useRef(false);
   useEffect(() => {
-    if (beginCheckoutTrackedRef.current || items.length === 0) return;
-    beginCheckoutTrackedRef.current = true;
-    trackPixelEvent("InitiateCheckout", {
-      content_ids: items.map((i) => i.id),
-      content_name: "Checkout",
-      content_type: "product",
-      value: grandTotal,
-      currency: "BDT",
-      num_items: items.reduce((sum, item) => sum + item.qty, 0),
-    });
-  }, [grandTotal, items]);
+    if (checkoutTracked.current || items.length === 0) return;
+    checkoutTracked.current = true;
+    trackInitiateCheckout(items.map((item) => ({ id: item.id, name: item.name, price: item.price, quantity: item.qty })));
+  }, [items]);
 
   useEffect(() => {
     setAppliedCoupon(null);
@@ -188,21 +218,6 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
         .then((order) => {
           if (order?.Id) {
             setIncompleteOrderId(order.Id);
-            if (leadTrackedOrderIdRef.current !== order.Id) {
-              leadTrackedOrderIdRef.current = order.Id;
-              trackPixelEvent(
-                "Lead",
-                {
-                  content_ids: items.map((i) => i.id),
-                  content_name: "Incomplete Checkout",
-                  content_type: "product",
-                  value: grandTotal,
-                  currency: "BDT",
-                  num_items: items.reduce((s, i) => s + i.qty, 0),
-                },
-                { name, phone: normalizedPhone },
-              );
-            }
           }
         })
         .catch(() => {});
@@ -296,24 +311,8 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
         total: grandTotal,
         tracking: getPixelClickData(),
       });
-      const orderPixelData = {
-        content_ids: items.map((i) => i.id),
-        content_type: "product",
-        value: grandTotal,
-        currency: "BDT",
-        num_items: items.reduce((s, i) => s + i.qty, 0),
-      };
-      const orderPixelUser = { name, phone: normalizedPhone };
-      trackPixelEvent(
-        "AddPaymentInfo",
-        { ...orderPixelData, content_name: "Checkout Payment Info" },
-        orderPixelUser,
-      );
-      trackPixelEvent(
-        "Purchase",
-        { ...orderPixelData, content_name: "Order Confirmed", order_id: order.Id },
-        orderPixelUser,
-      );
+      // Same event id and server-calculated value as the Conversions API Purchase.
+      trackPurchase(order.purchaseTracking);
       window.localStorage.setItem(
         "kafela_pending_reconfirm_order",
         JSON.stringify({
@@ -987,6 +986,27 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                                 Free Shipping
                               </p>
                             )}
+                            {(prizesByProduct.get(item.id) || []).length > 0 && (
+                              <p
+                                style={{
+                                  margin: "6px 0 0",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "#b45309",
+                                  background: "#fef3c7",
+                                }}
+                              >
+                                🎁 উপহার:{" "}
+                                {(prizesByProduct.get(item.id) || [])
+                                  .map(prizeName)
+                                  .join(", ")}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -1060,6 +1080,60 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                 </div>
               </div>
               {/* end overflow-x-auto */}
+
+              {orderPrizes.length > 0 && (
+                <div
+                  style={{
+                    margin: "16px 22px 0",
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                    border: "1px solid #fcd34d",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: "0 0 10px",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "#92400e",
+                    }}
+                  >
+                    🎁 এই অর্ডারের সাথে আপনি পাচ্ছেন
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {orderPrizes.map((prize) => (
+                      <span
+                        key={prize.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "5px 10px",
+                          borderRadius: 999,
+                          background: "#fff",
+                          border: "1px solid #fde68a",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#78350f",
+                        }}
+                      >
+                        {prize.image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={prize.image}
+                            alt=""
+                            width={20}
+                            height={20}
+                            style={{ borderRadius: 4, objectFit: "cover" }}
+                          />
+                        )}
+                        {prizeName(prize)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Price rows */}
               <div

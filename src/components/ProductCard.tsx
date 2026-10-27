@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Product } from "@/data/products";
 import OrderModal from "./OrderModal";
 import { useCart } from "@/context/CartContext";
-import { useCustomer } from "@/context/CustomerContext";
-import { trackPixelEvent } from "@/lib/pixel";
+import { productHref } from "@/lib/productUrl";
+import { trackAddToCart } from "@/lib/pixel";
 
 const PRIMARY   = "#111111";
 const SECONDARY = "#404040";
@@ -17,20 +17,6 @@ export default function ProductCard({ product }: { product: Product }) {
   const [showModal, setShowModal] = useState(false);
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
-  const { customer } = useCustomer();
-
-  const pixelProductData = {
-    content_ids: [product.id],
-    content_name: product.name,
-    content_type: "product",
-    value: product.discountedPrice,
-    currency: "BDT",
-    num_items: 1,
-  };
-
-  const pixelUserData = customer
-    ? { customerId: customer.Id, name: customer.name, phone: customer.phone }
-    : undefined;
 
   const handleAddToCart = () => {
     // Products with several variants need a choice first.
@@ -39,9 +25,14 @@ export default function ProductCard({ product }: { product: Product }) {
       return;
     }
     addToCart(product, 1, product.variants?.[0]);
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: product.variants?.[0]?.newPrice ?? product.discountedPrice,
+      quantity: 1,
+    });
     setAdded(true);
     setTimeout(() => setAdded(false), 1200);
-    trackPixelEvent("AddToCart", pixelProductData, pixelUserData);
   };
 
   const handleOrderNow = () => {
@@ -80,7 +71,7 @@ export default function ProductCard({ product }: { product: Product }) {
           </span>
         )}
 
-        <Link href={`/product/${product.id}`} className="block overflow-hidden">
+        <Link href={productHref(product)} className="block overflow-hidden">
           <div className="relative w-full bg-white" style={{ aspectRatio: "1 / 1" }}>
             <SafeImage
               sources={[product.image, ...(product.gallery || [])]}
@@ -93,7 +84,7 @@ export default function ProductCard({ product }: { product: Product }) {
         </Link>
 
         <Link
-          href={`/product/${product.id}`}
+          href={productHref(product)}
           className="block overflow-hidden px-2 text-center font-medium text-[#222] transition-colors hover:text-[#111111]"
           style={{
             display: "-webkit-box",

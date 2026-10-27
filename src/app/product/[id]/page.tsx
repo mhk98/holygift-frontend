@@ -1,4 +1,6 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { cache } from "react";
+import { notFound, permanentRedirect } from "next/navigation";
 import MarqueeBanner from "@/components/MarqueeBanner";
 import Header from "@/components/Header";
 import { SiteFooter } from "@/components/SiteChrome";
@@ -7,6 +9,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import ProductDetailClient from "@/components/ProductDetailClient";
 import Container from "@/components/Container";
 import { fetchProductById } from "@/services/productService";
+import { productHref } from "@/lib/productUrl";
 import { fetchSiteSettings, type SiteSetting } from "@/services/settingService";
 import { fetchNavItems } from "@/services/menuService";
 import {
@@ -22,23 +25,80 @@ export async function generateStaticParams() {
   return [];
 }
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://holygift.xyz").replace(/\/$/, "");
+
+// The route param is the slug, or the numeric Id used by older links.
+const loadProduct = cache((param: string) =>
+  fetchProductById(decodeURIComponent(param)),
+);
+
+function plainText(html: string | null | undefined, max = 160): string {
+  const text = String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const product = await loadProduct(id).catch(() => null);
+  if (!product) return {};
+
+  const title = product.metaTitle || product.name;
+  const description =
+    product.metaDescription ||
+    plainText(product.shortDescription) ||
+    plainText(product.description) ||
+    undefined;
+  const url = `${SITE_URL}${productHref(product)}`;
+  const images = [...new Set([product.image, ...(product.gallery || [])])]
+    .filter((src) => src && !src.startsWith("/placeholder"))
+    .slice(0, 4);
+
+  return {
+    title,
+    description,
+    keywords: product.metaKeyword || undefined,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      title,
+      description,
+      images: images.map((src) => ({ url: src, alt: product.name })),
+    },
+    twitter: {
+      card: images.length ? "summary_large_image" : "summary",
+      title,
+      description,
+      images,
+    },
+  };
+}
+
 export default async function ProductDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const productId = Number(id);
-  if (isNaN(productId)) notFound();
 
   const [product, settings, deliveryCharges, navItems] = await Promise.all([
-    fetchProductById(productId),
+    loadProduct(id),
     fetchSiteSettings().catch(() => ({}) as Partial<SiteSetting>),
     fetchDeliveryCharges().catch(() => []),
     fetchNavItems().catch(() => []),
   ]);
 
   if (!product) notFound();
+  // Old /product/<id> links move to the slug URL.
+  if (/^\d+$/.test(id) && product.slug) permanentRedirect(productHref(product));
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">

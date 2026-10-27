@@ -8,10 +8,9 @@ import { fetchNavItems } from "@/services/menuService";
 import { fetchStorefrontProducts } from "@/services/productService";
 import { fetchSiteSettings } from "@/services/settingService";
 import { useCart } from "@/context/CartContext";
-import { useCustomer } from "@/context/CustomerContext";
 import AccountMenu from "@/components/AccountMenu";
 import ScratchCardMenu from "@/components/ScratchCardMenu";
-import { trackPixelEvent } from "@/lib/pixel";
+import { productHref } from "@/lib/productUrl";
 
 const PRIMARY   = "#111111";   // logo black
 const SECONDARY = "#404040";   // charcoal accent
@@ -46,7 +45,6 @@ function HeaderInner({ logoUrl, navItems: navItemsProp }: HeaderProps) {
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const searchRef       = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
-  const lastSearchTrackedRef = useRef("");
   const searchSeqRef = useRef(0);
   const navRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
@@ -116,31 +114,9 @@ function HeaderInner({ logoUrl, navItems: navItemsProp }: HeaderProps) {
     return () => document.removeEventListener("mousedown", close);
   }, []);
   const { items, removeFromCart, totalItems, totalPrice } = useCart();
-  const { customer } = useCustomer();
   const [cartOpen, setCartOpen] = useState(false);
   const cartRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    const q = search.trim();
-    if (q.length < 2 || lastSearchTrackedRef.current === q) return;
-    const timer = window.setTimeout(() => {
-      lastSearchTrackedRef.current = q;
-      trackPixelEvent(
-        "Search",
-        {
-          content_ids: searchResults.map((item) => item.id),
-          content_name: q,
-          content_type: "product",
-          value: 0,
-          currency: "BDT",
-          num_items: searchResults.length,
-        },
-        customer ? { customerId: customer.Id, name: customer.name, phone: customer.phone } : undefined,
-      );
-    }, 800);
-    return () => window.clearTimeout(timer);
-  }, [customer, search, searchResults]);
 
   const handleCartCheckout = () => {
     setCartOpen(false);
@@ -292,7 +268,7 @@ function HeaderInner({ logoUrl, navItems: navItemsProp }: HeaderProps) {
             {searchOpen && searchResults.length > 0 && (
               <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 14, right: 14, background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", borderRadius: 8, border: "1px solid #e5e7eb", zIndex: 9999, maxHeight: 400, overflowY: "auto" }}>
                 {searchResults.map((p, idx) => (
-                  <Link key={p.id} href={`/product/${p.id}`} onClick={() => { setSearchOpen(false); setSearch(""); }}
+                  <Link key={p.id} href={productHref(p)} onClick={() => { setSearchOpen(false); setSearch(""); }}
                     style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderBottom: idx < searchResults.length - 1 ? "1px solid #f3f4f6" : "none", textDecoration: "none" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "")}
@@ -361,7 +337,7 @@ function HeaderInner({ logoUrl, navItems: navItemsProp }: HeaderProps) {
             {searchOpen && searchResults.length > 0 && (
               <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", borderRadius: 8, border: "1px solid #e5e7eb", zIndex: 9999, maxHeight: 480, overflowY: "auto" }}>
                 {searchResults.map((p, idx) => (
-                  <Link key={p.id} href={`/product/${p.id}`} onClick={() => { setSearchOpen(false); setSearch(""); }}
+                  <Link key={p.id} href={productHref(p)} onClick={() => { setSearchOpen(false); setSearch(""); }}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: idx < searchResults.length - 1 ? "1px solid #f3f4f6" : "none", textDecoration: "none", transition: "background 0.15s" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "")}

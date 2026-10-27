@@ -15,9 +15,13 @@ export async function saveIncompleteOrder(
 
 export async function createOrder(payload: CreateOrderPayload): Promise<ApiOrder> {
   // Safe to retry: the backend returns the already-created order for a repeated checkoutKey.
+  // A logged-in customer's token lets the server use their account for Purchase matching.
+  let token: string | null = null;
+  try { token = typeof window === "undefined" ? null : window.localStorage.getItem("customer_token"); } catch { /* storage blocked */ }
   const res = await apiFetch<ApiResponse<ApiOrder>>("/orders", {
     method: "POST",
     body: JSON.stringify(payload),
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     retries: payload.checkoutKey ? 2 : 0,
   });
   return res.data;

@@ -41,6 +41,7 @@ export interface ApiProduct {
   sku: string | null;
   freeShipping?: boolean | string | number;
   prizes?: ApiPrize[];
+  giftProducts?: ApiGiftProduct[];
   slug?: string | null;
   brand?: string | null;
   productVideo?: string | null;
@@ -67,6 +68,22 @@ export interface ApiPrize {
   name: string;
   nameBn?: string | null;
   image?: string | null;
+}
+
+export interface ApiGiftProduct {
+  Id: number;
+  name: string;
+  image?: string | null;
+  price: number;
+  variants?: ApiGiftVariant[];
+}
+
+export interface ApiGiftVariant {
+  id: number;
+  label: string;
+  price: number;
+  image?: string | null;
+  inStock: boolean;
 }
 
 export interface ApiProductOption {
@@ -105,6 +122,8 @@ export interface CreateOrderPayload {
   deliveryCharge: number;
   discount?: number;
   couponCode?: string | null;
+  /** Variant picked for each gift product: { [giftProductId]: variantId }. */
+  giftVariants?: Record<number, number>;
   advance?: number;
   total: number;
   tracking?: Record<string, unknown>;

@@ -6,7 +6,7 @@ import SafeImage from "@/components/SafeImage";
 import { useRouter } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { fetchProductById } from "@/services/productService";
-import type { ProductPrize } from "@/data/products";
+import type { ProductGift } from "@/data/products";
 import { createOrder, saveIncompleteOrder } from "@/services/orderService";
 import { fetchSiteSettings, type SiteSetting } from "@/services/settingService";
 import {
@@ -52,9 +52,9 @@ function getCouponErrorMessage(error: unknown) {
   return message || "কুপন প্রযোজ্য নয়।";
 }
 
-// Prizes come from the live product, not the saved cart, so admin changes show up.
-function useCartPrizes(items: CartItem[]) {
-  const [prizes, setPrizes] = useState<Map<number, ProductPrize[]>>(new Map());
+// Gifts come from the live product, not the saved cart, so admin changes show up.
+function useCartGifts(items: CartItem[]) {
+  const [gifts, setGifts] = useState<Map<number, ProductGift[]>>(new Map());
   const idsKey = [...new Set(items.map((item) => item.id))].sort().join(",");
 
   useEffect(() => {
@@ -64,33 +64,37 @@ function useCartPrizes(items: CartItem[]) {
       idsKey.split(",").map(Number).map((id) =>
         fetchProductById(id)
           .catch(() => null)
-          .then((product) => [id, product?.prizes || []] as const),
+          .then((product) => [id, product?.giftProducts || []] as const),
       ),
     ).then((entries) => {
-      if (active) setPrizes(new Map(entries));
+      if (active) setGifts(new Map(entries));
     });
     return () => {
       active = false;
     };
   }, [idsKey]);
 
-  return prizes;
+  return gifts;
 }
-
-const prizeName = (prize: ProductPrize) => prize.nameBn || prize.name;
 
 function CheckoutContent({ header, footer }: SiteChromeSlots) {
   const checkout = useCheckoutSession();
   const router = useRouter();
   const { items, removeFromCart, updateQty, clearCart, totalPrice } = useCart();
-  const prizesByProduct = useCartPrizes(items);
-  const orderPrizes = [
+  const giftsByProduct = useCartGifts(items);
+  const orderGifts = [
     ...new Map(
       items
-        .flatMap((item) => prizesByProduct.get(item.id) || [])
-        .map((prize) => [prize.id, prize] as const),
+        .flatMap((item) => giftsByProduct.get(item.id) || [])
+        .map((gift) => [gift.id, gift] as const),
     ).values(),
   ];
+  // Variant picked for each gift product; a gift with one variant needs no pick.
+  const [giftPicks, setGiftPicks] = useState<Record<number, number>>({});
+  const pickedGiftVariant = (gift: ProductGift) =>
+    gift.variants.find((variant) => variant.id === giftPicks[gift.id]);
+  const giftNeedsPick = (gift: ProductGift) => gift.variants.length > 1;
+  const giftPrice = (gift: ProductGift) => pickedGiftVariant(gift)?.price ?? gift.price;
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -122,7 +126,10 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
   );
   const deliveryCharge = allItemsFreeShipping ? 0 : regularDeliveryCharge;
   const discount = appliedCoupon?.discount || 0;
-  const grandTotal = Math.max(0, totalPrice + deliveryCharge - discount);
+  // Gift products are charged once per order; the server adds them as their own lines.
+  const giftTotal = orderGifts.reduce((sum, gift) => sum + giftPrice(gift), 0);
+  const subtotal = totalPrice + giftTotal;
+  const grandTotal = Math.max(0, subtotal + deliveryCharge - discount);
   const paymentMethods = [
     {
       id: "cod" as const,
@@ -206,10 +213,11 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
             color: i.color,
             freeShipping: i.freeShipping,
           })),
-          subtotal: totalPrice,
+          subtotal,
           deliveryCharge,
           discount,
           couponCode: appliedCoupon?.code || null,
+          giftVariants: giftPicks,
           total: grandTotal,
           tracking: getPixelClickData(),
         },
@@ -240,7 +248,8 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
     payment,
     phone,
     deviceId,
-    totalPrice,
+    subtotal,
+    giftPicks,
   ]);
 
   const handleApplyCoupon = async () => {
@@ -253,7 +262,7 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
     setCouponLoading(true);
     setCouponMessage("");
     try {
-      const result = await validateCoupon(code, totalPrice);
+      const result = await validateCoupon(code, subtotal);
       setAppliedCoupon(result);
       setCouponMessage(`কুপন applied: ৳${fmt(result.discount)} discount`);
     } catch (error) {
@@ -277,6 +286,11 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
     }
     if (items.length === 0) {
       setErrorMsg("কোনো পণ্য নেই।");
+      return;
+    }
+    const unpickedGift = orderGifts.find((gift) => giftNeedsPick(gift) && !pickedGiftVariant(gift));
+    if (unpickedGift) {
+      setErrorMsg(`উপহার "${unpickedGift.name}" এর variant বাছাই করুন।`);
       return;
     }
     checkout.submitting.current = true;
@@ -304,10 +318,11 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
           color: i.color,
           freeShipping: i.freeShipping,
         })),
-        subtotal: totalPrice,
+        subtotal,
         deliveryCharge,
         discount,
         couponCode: appliedCoupon?.code || null,
+        giftVariants: giftPicks,
         total: grandTotal,
         tracking: getPixelClickData(),
       });
@@ -986,7 +1001,7 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                                 Free Shipping
                               </p>
                             )}
-                            {(prizesByProduct.get(item.id) || []).length > 0 && (
+                            {(giftsByProduct.get(item.id) || []).length > 0 && (
                               <p
                                 style={{
                                   margin: "6px 0 0",
@@ -1002,8 +1017,8 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                                 }}
                               >
                                 🎁 উপহার:{" "}
-                                {(prizesByProduct.get(item.id) || [])
-                                  .map(prizeName)
+                                {(giftsByProduct.get(item.id) || [])
+                                  .map((gift) => gift.name)
                                   .join(", ")}
                               </p>
                             )}
@@ -1081,7 +1096,7 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
               </div>
               {/* end overflow-x-auto */}
 
-              {orderPrizes.length > 0 && (
+              {orderGifts.length > 0 && (
                 <div
                   style={{
                     margin: "16px 22px 0",
@@ -1102,9 +1117,12 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                     🎁 এই অর্ডারের সাথে আপনি পাচ্ছেন
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {orderPrizes.map((prize) => (
+                    {orderGifts.map((gift) => (
+                      <div
+                        key={gift.id}
+                        style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                      >
                       <span
-                        key={prize.id}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
@@ -1118,18 +1136,51 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                           color: "#78350f",
                         }}
                       >
-                        {prize.image && (
+                        {gift.image && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={prize.image}
+                            src={gift.image}
                             alt=""
                             width={20}
                             height={20}
                             style={{ borderRadius: 4, objectFit: "cover" }}
                           />
                         )}
-                        {prizeName(prize)}
+                        {gift.name}
+                        {pickedGiftVariant(gift) && ` (${pickedGiftVariant(gift)?.label})`}
+                        {giftPrice(gift) > 0 && (
+                          <span style={{ color: "#b45309", fontWeight: 700 }}>
+                            ৳{fmt(giftPrice(gift))}
+                          </span>
+                        )}
                       </span>
+                      {giftNeedsPick(gift) && (
+                        <select
+                          value={giftPicks[gift.id] ?? ""}
+                          onChange={(e) =>
+                            setGiftPicks((prev) => ({ ...prev, [gift.id]: Number(e.target.value) }))
+                          }
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: `1px solid ${pickedGiftVariant(gift) ? "#fde68a" : "#f59e0b"}`,
+                            background: "#fff",
+                            fontSize: 13,
+                            color: "#78350f",
+                          }}
+                        >
+                          <option value="" disabled>
+                            উপহারের variant বাছাই করুন
+                          </option>
+                          {gift.variants.map((variant) => (
+                            <option key={variant.id} value={variant.id} disabled={!variant.inStock}>
+                              {variant.label} — ৳{fmt(variant.price)}
+                              {variant.inStock ? "" : " (stock নেই)"}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1145,7 +1196,7 @@ function CheckoutContent({ header, footer }: SiteChromeSlots) {
                 }}
               >
                 {[
-                  { label: "মোট", value: `৳${fmt(totalPrice)}` },
+                  { label: "মোট", value: `৳${fmt(subtotal)}` },
                   {
                     label: "ডেলিভারি চার্জ",
                     value: allItemsFreeShipping

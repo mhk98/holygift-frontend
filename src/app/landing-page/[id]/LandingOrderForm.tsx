@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCheckoutSession } from "@/lib/useCheckoutSession";
 import { createOrder, saveIncompleteOrder } from "@/services/orderService";
-import { getPixelClickData, trackAddToCart, trackInitiateCheckout, trackPurchase, trackViewContent, type TrackItem } from "@/lib/pixel";
+import {
+  getPixelClickData,
+  trackAddToCart,
+  trackInitiateCheckout,
+  trackPurchase,
+  trackViewContent,
+  type TrackItem,
+} from "@/lib/pixel";
 import type { CreateOrderPayload } from "@/types/api";
 
 export interface LandingOrderOption {
@@ -117,7 +124,10 @@ export default function LandingOrderForm({
   }, []);
 
   // Landing offers are tracked under their linked product with the offer price.
-  const trackItem = (item: LandingOrderOption, quantity: number): TrackItem => ({
+  const trackItem = (
+    item: LandingOrderOption,
+    quantity: number,
+  ): TrackItem => ({
     id: item.productId || landingId,
     name: item.name,
     price: item.price,
@@ -187,7 +197,8 @@ export default function LandingOrderForm({
   };
 
   function toggleOption(option: LandingOrderOption) {
-    if (!selected.some((item) => item.id === option.id)) trackAddToCart(trackItem(option, 1));
+    if (!selected.some((item) => item.id === option.id))
+      trackAddToCart(trackItem(option, 1));
     setSelected((current) => {
       if (current.some((item) => item.id === option.id)) {
         const next = current.filter((item) => item.id !== option.id);
@@ -300,7 +311,7 @@ export default function LandingOrderForm({
     try {
       const order = await createOrder(buildPayload("pending", normalizedPhone));
       trackPurchase(order.purchaseTracking);
-      // invoiceId is the display number (HD-xxxx); orderId is the raw stored value.
+      // invoiceId is the display number (HG-xxxx); orderId is the raw stored value.
       const invoiceId = order.invoiceId || order.orderId || String(order.Id);
       // Same hand-off as the cart checkout, so /order-success and re-confirm work alike.
       window.localStorage.setItem(

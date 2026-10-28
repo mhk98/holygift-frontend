@@ -22,6 +22,8 @@ export interface Product {
   metaDescription?: string | null;
   /** Scratch card prizes given away with this product. */
   prizes?: ProductPrize[];
+  /** Products given free with this product. */
+  giftProducts?: ProductGift[];
   /** True when the customer must pick a variant (more than one to choose from). */
   hasVariants?: boolean;
   priceMin?: number;
@@ -39,6 +41,23 @@ export interface ProductPrize {
   name: string;
   nameBn?: string | null;
   image?: string | null;
+}
+
+export interface ProductGift {
+  id: number;
+  name: string;
+  image?: string | null;
+  /** Cheapest variant price; the picked variant's price is charged. */
+  price: number;
+  variants: ProductGiftVariant[];
+}
+
+export interface ProductGiftVariant {
+  id: number;
+  label: string;
+  price: number;
+  image?: string | null;
+  inStock: boolean;
 }
 
 export interface ProductVariant {

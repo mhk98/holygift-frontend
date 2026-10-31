@@ -40,7 +40,7 @@ Holy Gift storefront (holydeen-frontend, Next.js 16 App Router) এ category pag
 
 ## যাচাই
 
-- `npx tsc --noEmit` আর `npm run build` (`NEXT_PUBLIC_API_URL=https://api.holygift.xyz` দিয়ে) সফল হবে। Build output এ category route `●` (ISR) দেখাবে, `ƒ` না।
+- `npx tsc --noEmit` আর `npm run build` (`NEXT_PUBLIC_API_URL=http://localhost:5000` দিয়ে) সফল হবে। Build output এ category route `●` (ISR) দেখাবে, `ƒ` না।
 - `next start` চালিয়ে প্রতিটা category, subcategory আর child-category খুলে মিলিয়ে দেখবে:
   - পুরনো `/?menu=...` URL এ যে product আসে, নতুন URL এও ঠিক সেগুলোই আসছে।
   - দ্বিতীয় request এ `x-nextjs-cache: HIT` আসছে।

@@ -166,7 +166,9 @@ const EXTRA_TONES: [string, string][] = [
   ["#be123c", "#9333ea"],
 ];
 
-function toPrizeOptions(prizes: ScratchCardPrize[] | null | undefined): PrizeOption[] {
+function toPrizeOptions(
+  prizes: ScratchCardPrize[] | null | undefined,
+): PrizeOption[] {
   if (!prizes) return BUILT_IN_PRIZES;
   let extra = 0;
   return prizes.map((p) => {
@@ -402,7 +404,8 @@ export default function ScratchCardClient({
       next.phone = "সঠিক ১১ ডিজিটের ফোন নম্বর দিন (01XXXXXXXXX)";
     if (!address.trim()) next.address = "ডেলিভারি ঠিকানা লিখুন";
     else if (address.trim().length < MIN_ADDRESS_LENGTH)
-      next.address = "পুরো ঠিকানা লিখুন (গ্রাম/এলাকা, থানা, জেলা) — কমপক্ষে ১০ অক্ষর";
+      next.address =
+        "পুরো ঠিকানা লিখুন (গ্রাম/এলাকা, থানা, জেলা) — কমপক্ষে ১০ অক্ষর";
     if (!image) next.image = "স্ক্র্যাচ কার্ডের ছবি আপলোড করুন";
     if (!prize.trim()) next.prize = "আপনার প্রাপ্ত পুরস্কারটি নির্বাচন করুন";
     return next;
@@ -741,7 +744,8 @@ export default function ScratchCardClient({
                           />
                         ) : (
                           <p id="sc-address-help" className={styles.help}>
-                            যে ঠিকানায় আপনার অর্ডার ডেলিভারি হয়েছিল (গ্রাম/এলাকা, থানা, জেলা)
+                            যে ঠিকানায় আপনার অর্ডার ডেলিভারি হয়েছিল
+                            (গ্রাম/এলাকা, থানা, জেলা)
                           </p>
                         )}
                       </div>
@@ -831,7 +835,9 @@ export default function ScratchCardClient({
                           instanceId="sc-prize"
                           inputId="sc-prize"
                           options={prizeOptions}
-                          value={prizeOptions.find((p) => p.value === prize) || null}
+                          value={
+                            prizeOptions.find((p) => p.value === prize) || null
+                          }
                           onChange={(option) => {
                             setPrize(option?.value || "");
                             clearError("prize");
@@ -845,7 +851,9 @@ export default function ScratchCardClient({
                           // The form card clips overflow, so the menu renders
                           // on <body> and flips up when there is no room below.
                           menuPortalTarget={
-                            typeof document === "undefined" ? null : document.body
+                            typeof document === "undefined"
+                              ? null
+                              : document.body
                           }
                           menuPosition="fixed"
                           menuPlacement="auto"
@@ -920,12 +928,12 @@ export default function ScratchCardClient({
               <Icon size={26}>{TICKET_ICON}</Icon>
             </div>
             <h2 id="sc-claimed-title" className={styles.modalTitle}>
-              এই নম্বরে আগেই পুরস্কার নেওয়া হয়েছে
+              এই নম্বরে আগেই পুরস্কারের জন্য স্ক্র্যাচ কার্ড জমা দেওয়া হয়েছে
             </h2>
             <p className={styles.modalText}>
               <strong>{claimedPhone}</strong> নম্বরে আপনি একটি স্ক্র্যাচ কার্ড
-              পুরস্কার নিয়েছেন। আপনার হাতে যদি আরেকটি স্ক্র্যাচ কার্ড থাকে,
-              তাহলে নিচের বাটনে ক্লিক করুন।
+              জমা দিয়েছেন। আপনার হাতে যদি আরেকটি স্ক্র্যাচ কার্ড থাকে, তাহলে
+              নিচের বাটনে ক্লিক করুন।
             </p>
             <div className={styles.modalActions}>
               <button

@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.holygift.xyz";
 
 // Server-side Node.js fetch needs absolute URL; browser uses relative (goes through Next.js rewrites)
 export const BASE =
